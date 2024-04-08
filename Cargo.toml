@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 logos = "0.14.0"
+logos-nom-bridge = "0.1.0"
+nom = "7.1.3"
