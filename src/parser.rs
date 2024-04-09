@@ -1,4 +1,3 @@
-
 use crate::lexer::{self, Token};
 use logos::Logos;
 use nom::{self, Err};
@@ -64,12 +63,20 @@ pub struct Assignment {
 
 #[derive(Debug, PartialEq)]
 pub struct IfStatement {
-
+    condition: Expression,
+    block: Block
 }
 
 #[derive(Debug, PartialEq)]
 pub struct WhileLoop {
+    condition: Expression,
+    block: Block
+}
 
+#[derive(Debug, PartialEq)]
+pub struct FunctionCall {
+    name: FunctionIdentifier,
+    arguments: Arguments
 }
 
 
@@ -82,20 +89,22 @@ pub enum Expression {
     Multiplication(Box<(Expression, Expression)>),
     Division(Box<(Expression, Expression)>),
     Modulo(Box<(Expression, Expression)>),
-    FunctionCall(FunctionIdentifier, Arguments)
+    FunctionCall(FunctionCall)
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Assignment(Assignment),
     IfStatement(IfStatement),
-    WhileLoop(WhileLoop)
+    WhileLoop(WhileLoop),
+    FunctionCall(FunctionCall)
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Function {
     name: FunctionIdentifier,
-    parameters: Parameters
+    parameters: Parameters,
+    block: Block
 }
 
 #[derive(Debug, PartialEq)]
@@ -138,14 +147,26 @@ fn parse_argument(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>)
 }
 
 fn parse_expression_p1(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
-    let token = get_token(lex.next())?;
+    let token = get_peak_token(lex.peek())?;
     match token {
         Token::Identifier(id) => {
-            //Todo handle function call
-            return Ok(Expression::Variable(id))
+            let mut tmp_lex = lex.clone();
+            tmp_lex.next();
+            let next_token = get_token(tmp_lex.next())?;
+            return match next_token {
+                Token::OpeningRoundBracket => Ok(Expression::FunctionCall(parse_function_call(lex)?)),
+                _ => {
+                    lex.next();
+                    Ok(Expression::Variable(id))
+                }
+            };
         },
-        Token::Number(n) => Ok(Expression::Number(n)),
+        Token::Number(n) => {
+            lex.next();
+            Ok(Expression::Number(n))
+        },
         Token::OpeningRoundBracket => {
+            lex.next();
             let expr = parse_expression_p3(lex)?;
             let closing_token = get_token(lex.next())?;
             if closing_token != Token::ClosingRoundBracket {
@@ -208,19 +229,84 @@ fn parse_expression(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>
     parse_expression_p3(lex)
 }
 
+fn parse_if_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
+    check_token(get_token(lex.next())?, Token::IfStatement)?;
+    check_token(get_token(lex.next())?, Token::OpeningRoundBracket)?;
+    let condition = parse_expression(lex)?;
+    check_token(get_token(lex.next())?, Token::ClosingRoundBracket)?;
+    check_token(get_token(lex.next())?, Token::OpeningCurlyBracket)?;
+    let block = parse_block(lex)?;
+    check_token(get_token(lex.next())?, Token::ClosingCurlyBracket)?;
+    Ok(Statement::IfStatement(IfStatement { condition, block }))
+}
+
+fn parse_while_loop(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
+    check_token(get_token(lex.next())?, Token::WhileLoop)?;
+    check_token(get_token(lex.next())?, Token::OpeningRoundBracket)?;
+    let condition = parse_expression(lex)?;
+    check_token(get_token(lex.next())?, Token::ClosingRoundBracket)?;
+    check_token(get_token(lex.next())?, Token::OpeningCurlyBracket)?;
+    let block = parse_block(lex)?;
+    check_token(get_token(lex.next())?, Token::ClosingCurlyBracket)?;
+    Ok(Statement::WhileLoop(WhileLoop { condition, block }))
+}
+
+fn parse_arguments(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Arguments>{
+    let mut arguments:Arguments = Vec::new();
+    loop {
+        let token = get_peak_token(lex.peek())?;
+        match token {
+            Token::ClosingRoundBracket => return Ok(arguments),
+            _ => {
+                let expression = parse_expression(lex)?;
+                let next_token = get_peak_token(lex.peek())?;
+                match next_token {
+                    Token::Comma => lex.next(),
+                    Token::ClosingRoundBracket => None,
+                    _ => return Err(ParseError::UnexpectedToken2(vec![Token::Comma, Token::ClosingRoundBracket], token))
+                };
+                arguments.push(expression);
+            }
+        }
+    }
+}
+
+
+fn parse_function_call(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<FunctionCall>{
+    let token = get_token(lex.next())?;
+    let name = match token {
+        Token::Identifier(id) => id,
+        _ => return Err(ParseError::UnexpectedToken(Token::Identifier("".to_owned()), token))
+    };
+    check_token(get_token(lex.next())?, Token::OpeningRoundBracket)?;
+    let arguments = parse_arguments(lex)?;
+    check_token(get_token(lex.next())?, Token::ClosingRoundBracket)?;
+    Ok(FunctionCall { name, arguments })
+}
+
+fn parse_function_call_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
+    let function_call = parse_function_call(lex)?;
+    check_token(get_token(lex.next())?, Token::Semicolon)?;
+    Ok(Statement::FunctionCall(function_call))
+}
+
+
 fn parse_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
     let token = get_peak_token(lex.peek())?;
     match token {
-        Token::Identifier(id) => {
+        Token::Identifier(_) => {
             let mut tmp_lex = lex.clone();
             tmp_lex.next();
             let next_token = get_token(tmp_lex.next())?;
             match next_token {
                 Token::Assignment => return parse_assignment(lex),
+                Token::OpeningRoundBracket => parse_function_call_statement(lex),
                 //expect assignment or function call
                 _ => return Err(ParseError::UnexpectedToken2(vec![Token::Assignment, Token::OpeningRoundBracket], next_token))
             }
-        }
+        },
+        Token::IfStatement => parse_if_statement(lex),
+        Token::WhileLoop => parse_while_loop(lex),
         _ => return Err(ParseError::UnexpectedToken2(vec![Token::Identifier("".to_owned()), Token::IfStatement, Token::WhileLoop], token))
     }
 }
@@ -254,9 +340,9 @@ fn parse_function(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>)
     let parameters = parse_argument(lex)?;
     check_token(get_token(lex.next())?, lexer::Token::ClosingRoundBracket)?;
     check_token(get_token(lex.next())?, lexer::Token::OpeningCurlyBracket)?;
-    //todo block parser
+    let block = parse_block(lex)?;
     check_token(get_token(lex.next())?, lexer::Token::ClosingCurlyBracket)?;
-    Ok(Function { name, parameters})
+    Ok(Function { name, parameters, block})
 }
 
 
@@ -284,6 +370,56 @@ pub fn test() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parser_function_with_args() {
+        let code = "fun test(a, b){}";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_function(&mut lex), Ok(Function { name: "test".to_owned(), parameters: vec!["a".to_owned(), "b".to_owned()], block: vec![] }))
+    }
+
+    #[test]
+    fn parser_function() {
+        let code = "fun test(){}";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_function(&mut lex), Ok(Function { name: "test".to_owned(), parameters: vec![], block: vec![] }))
+    }
+
+    #[test]
+    fn parser_function_call_statement_with_args() {
+        let code = "test(a, 1+2);";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_function_call_statement(&mut lex), Ok(Statement::FunctionCall(FunctionCall { name: "test".to_owned(), arguments: vec![Expression::Variable("a".to_owned()), Expression::Addition(Box::new((Expression::Number(1), Expression::Number(2))))] })))
+    }
+
+
+    #[test]
+    fn parser_function_call_expression() {
+        let code = "test();";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::FunctionCall(FunctionCall { name: "test".to_owned(), arguments: vec![] })))
+    }
+
+    #[test]
+    fn parser_function_call_statement() {
+        let code = "test();";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_function_call_statement(&mut lex), Ok(Statement::FunctionCall(FunctionCall { name: "test".to_owned(), arguments: vec![] })))
+    }
+
+    #[test]
+    fn parser_if_statement_simple() {
+        let code = "if(1){}";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_if_statement(&mut lex), Ok(Statement::IfStatement(IfStatement { condition: Expression::Number(1), block: vec![] })))
+    }
+
+    #[test]
+    fn parser_while_loop_simple() {
+        let code = "while(1){}";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_while_loop(&mut lex), Ok(Statement::WhileLoop(WhileLoop { condition: Expression::Number(1), block: vec![] })))
+    }
 
     #[test]
     fn parser_block() {
