@@ -53,11 +53,13 @@ pub type FunctionIdentifier = String;
 pub type Parameters = Vec<Parameter>;
 pub type VariableName = String;
 pub type Arguments = Vec<Expression>;
+pub type Block = Vec<Statement>;
 
 
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-
+    variable_name: VariableName,
+    expression: Expression
 }
 
 #[derive(Debug, PartialEq)]
@@ -200,16 +202,49 @@ fn parse_expression_p3(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Tok
     }
 }
 
+//todo add expr parser for && ||
+
 fn parse_expression(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
     parse_expression_p3(lex)
+}
+
+fn parse_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
+    let token = get_peak_token(lex.peek())?;
+    match token {
+        Token::Identifier(id) => {
+            let mut tmp_lex = lex.clone();
+            tmp_lex.next();
+            let next_token = get_token(tmp_lex.next())?;
+            match next_token {
+                Token::Assignment => return parse_assignment(lex),
+                //expect assignment or function call
+                _ => return Err(ParseError::UnexpectedToken2(vec![Token::Assignment, Token::OpeningRoundBracket], next_token))
+            }
+        }
+        _ => return Err(ParseError::UnexpectedToken2(vec![Token::Identifier("".to_owned()), Token::IfStatement, Token::WhileLoop], token))
+    }
+}
+
+fn parse_block(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Block>{
+    let mut block: Block = Vec::new();
+    loop {
+        let token = get_peak_token(lex.peek())?;
+        match token {
+            Token::ClosingCurlyBracket => return Ok(block),
+            _ => {
+                let statement = parse_statement(lex)?;
+                block.push(statement);
+            }
+        };
+    }
 }
 
 fn parse_assignment(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
     let variable_name = get_identifier(get_token(lex.next())?)?;
     check_token(get_token(lex.next())?, lexer::Token::Assignment)?;
-    //parse expression
+    let expression = parse_expression(lex)?;
     check_token(get_token(lex.next())?, lexer::Token::Semicolon)?;
-    Ok(Statement::Assignment(Assignment {  }))
+    Ok(Statement::Assignment(Assignment { variable_name, expression }))
 }
 
 fn parse_function(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Function>{
@@ -221,7 +256,7 @@ fn parse_function(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>)
     check_token(get_token(lex.next())?, lexer::Token::OpeningCurlyBracket)?;
     //todo block parser
     check_token(get_token(lex.next())?, lexer::Token::ClosingCurlyBracket)?;
-    Ok(Function { name: name, parameters: parameters})
+    Ok(Function { name, parameters})
 }
 
 
@@ -251,45 +286,80 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parser_block() {
+        let st1 = "a = 5;";
+        let st2 = "b = 6 - 4;";
+        let mut code = "".to_owned();
+        code.push_str(st1);
+        code.push_str(st2);
+        code.push_str("}");
+        let mut lex = lexer::Token::lexer(&code).peekable();
+        let mut st1_lex = lexer::Token::lexer(st1).peekable();
+        let mut st2_lex = lexer::Token::lexer(st2).peekable();
+        let st1 = parse_statement(&mut st1_lex).unwrap();
+        let st2 = parse_statement(&mut st2_lex).unwrap();
+        assert_eq!(parse_block(&mut lex), Ok(vec![st1, st2]))
+    }
+
+    #[test]
+    fn parser_statement() {
+        let code = "b = 6 - 4;";
+        let mut lex = lexer::Token::lexer(&code).peekable();
+        assert_eq!( parse_statement(&mut lex),
+            Ok(Statement::Assignment(Assignment { variable_name: "b".to_owned(), expression: Expression::Subtraction(Box::new((Expression::Number(6), Expression::Number(4)))) })))
+    }
+
+    #[test]
+    fn parser_assignment() {
+        let expr = "(4 - 1) * 6;";
+        let mut code = "abc = ".to_owned();
+        code.push_str(expr);
+        let mut lex = lexer::Token::lexer(&code).peekable();
+        let mut expr_lex = lexer::Token::lexer(expr).peekable();
+        let expr = parse_expression(&mut expr_lex).unwrap();
+        assert_eq!(parse_assignment(&mut lex), Ok(Statement::Assignment(Assignment { variable_name: "abc".to_owned(), expression: expr })))
+    }
+
+    #[test]
     fn parser_expression_additon() {
         let code = "1 + 2;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Addition(Box::new((Expression::Number(1), Expression::Number(2))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Addition(Box::new((Expression::Number(1), Expression::Number(2))))))
     }
 
     #[test]
     fn parser_expression_subtraction() {
         let code = "3 - 4;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Subtraction(Box::new((Expression::Number(3), Expression::Number(4))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Subtraction(Box::new((Expression::Number(3), Expression::Number(4))))))
     }
 
     #[test]
     fn parser_expression_multiplication() {
         let code = "5 * 6;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Multiplication(Box::new((Expression::Number(5), Expression::Number(6))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Multiplication(Box::new((Expression::Number(5), Expression::Number(6))))))
     }
 
     #[test]
     fn parser_expression_division() {
         let code = "8 / 4;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Division(Box::new((Expression::Number(8), Expression::Number(4))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Division(Box::new((Expression::Number(8), Expression::Number(4))))))
     }
 
     #[test]
     fn parser_expression_modulo() {
         let code = "911 % 10;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Modulo(Box::new((Expression::Number(911), Expression::Number(10))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Modulo(Box::new((Expression::Number(911), Expression::Number(10))))))
     }
 
     #[test]
     fn parser_expression_1() {
         let code = "7 - 5 + 1;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Addition(Box::new((Expression::Subtraction(Box::new((Expression::Number(7), Expression::Number(5)))), Expression::Number(1))))), parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Addition(Box::new((Expression::Subtraction(Box::new((Expression::Number(7), Expression::Number(5)))), Expression::Number(1))))))
     }
 
     #[test]
@@ -303,7 +373,9 @@ mod tests {
     fn parser_expression_3() {
         let code = "a + 2 * (b + 4);";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(Ok(Expression::Addition(
+        assert_eq!(
+            parse_expression(&mut lex),
+            Ok(Expression::Addition(
             Box::new((
                 Expression::Variable("a".to_owned()),
                 Expression::Multiplication(
@@ -318,6 +390,6 @@ mod tests {
                     ))
                 )
             ))
-        )), parse_expression(&mut lex))
+        )))
     }
 }
