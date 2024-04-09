@@ -1,12 +1,19 @@
 mod lexer;
 mod parser;
+mod semantic;
+
 fn main() {
     let code = "
-    fun main() {
-        if(a == 1 && 2 > 3){
-            c = 4;
-        }
+    fun main(a,b,a) {
     }
     ";
-    println!("{:?}", parser::parse(&mut lexer::lex(code)));
+    let program = parser::parse(&mut lexer::lex(code));
+    match program {
+        Ok(p) => {
+            println!("{:?}",semantic::check(&p));
+            println!("{:?}", p);
+        },
+        Err(e) => println!("{:?}", e)
+    }
+
 }

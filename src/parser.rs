@@ -56,26 +56,26 @@ pub type Block = Vec<Statement>;
 
 #[derive(Debug, PartialEq)]
 pub struct Assignment {
-    variable_name: VariableName,
-    expression: Expression
+    pub variable_name: VariableName,
+    pub expression: Expression
 }
 
 #[derive(Debug, PartialEq)]
 pub struct IfStatement {
-    condition: Expression,
-    block: Block
+    pub condition: Expression,
+    pub block: Block
 }
 
 #[derive(Debug, PartialEq)]
 pub struct WhileLoop {
-    condition: Expression,
-    block: Block
+    pub condition: Expression,
+    pub block: Block
 }
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionCall {
-    name: FunctionIdentifier,
-    arguments: Arguments
+    pub name: FunctionIdentifier,
+    pub arguments: Arguments
 }
 
 
@@ -109,14 +109,14 @@ pub enum Statement {
 
 #[derive(Debug, PartialEq)]
 pub struct Function {
-    name: FunctionIdentifier,
-    parameters: Parameters,
-    block: Block
+    pub name: FunctionIdentifier,
+    pub parameters: Parameters,
+    pub block: Block
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
-    functions: Vec<Function>
+    pub functions: Vec<Function>
 }
 
 fn get_identifier(token: lexer::Token) -> ParseResult<String>{
