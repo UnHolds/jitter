@@ -1,6 +1,5 @@
 use crate::lexer::{self, Token};
-use logos::Logos;
-use nom::{self, Err};
+
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
@@ -89,6 +88,14 @@ pub enum Expression {
     Multiplication(Box<(Expression, Expression)>),
     Division(Box<(Expression, Expression)>),
     Modulo(Box<(Expression, Expression)>),
+    Greater(Box<(Expression, Expression)>),
+    GreaterEquals(Box<(Expression, Expression)>),
+    Less(Box<(Expression, Expression)>),
+    LessEquals(Box<(Expression, Expression)>),
+    Equals(Box<(Expression, Expression)>),
+    NotEquals(Box<(Expression, Expression)>),
+    LogicAnd(Box<(Expression, Expression)>),
+    LogicOr(Box<(Expression, Expression)>),
     FunctionCall(FunctionCall)
 }
 
@@ -223,10 +230,85 @@ fn parse_expression_p3(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Tok
     }
 }
 
-//todo add expr parser for && ||
+fn parse_expression_p4(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
+    let mut left_side = parse_expression_p3(lex)?;
+    loop {
+        let token = get_peak_token(lex.peek())?;
+        match token {
+            Token::Greater => {
+                lex.next();
+                let right_side = parse_expression_p3(lex)?;
+                left_side = Expression::Greater(Box::new((left_side, right_side)));
+            },
+            Token::GreaterEquals => {
+                lex.next();
+                let right_side = parse_expression_p3(lex)?;
+                left_side = Expression::GreaterEquals(Box::new((left_side, right_side)));
+            },
+            Token::Less => {
+                lex.next();
+                let right_side = parse_expression_p3(lex)?;
+                left_side = Expression::Less(Box::new((left_side, right_side)));
+            },
+            Token::LessEquals => {
+                lex.next();
+                let right_side = parse_expression_p3(lex)?;
+                left_side = Expression::LessEquals(Box::new((left_side, right_side)));
+            },
+            _ => return Ok(left_side)
+        }
+    }
+}
+
+
+fn parse_expression_p5(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
+    let mut left_side = parse_expression_p4(lex)?;
+    loop {
+        let token = get_peak_token(lex.peek())?;
+        match token {
+            Token::Equals => {
+                lex.next();
+                let right_side = parse_expression_p4(lex)?;
+                left_side = Expression::Equals(Box::new((left_side, right_side)));
+            },
+            Token::NotEquals => {
+                lex.next();
+                let right_side = parse_expression_p4(lex)?;
+                left_side = Expression::NotEquals(Box::new((left_side, right_side)));
+            },
+            _ => return Ok(left_side)
+        }
+    }
+}
+
+fn parse_expression_p6(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
+    let left_side = parse_expression_p5(lex)?;
+    let token = get_peak_token(lex.peek())?;
+    match token {
+        Token::LogicAnd => {
+            lex.next();
+            let right_side = parse_expression_p5(lex)?;
+            Ok(Expression::LogicAnd(Box::new((left_side, right_side))))
+        },
+        _ => Ok(left_side)
+    }
+}
+
+fn parse_expression_p7(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
+    let left_side = parse_expression_p6(lex)?;
+    let token = get_peak_token(lex.peek())?;
+    match token {
+        Token::LogicOr => {
+            lex.next();
+            let right_side = parse_expression_p6(lex)?;
+            Ok(Expression::LogicOr(Box::new((left_side, right_side))))
+        },
+        _ => Ok(left_side)
+    }
+}
 
 fn parse_expression(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Expression>{
-    parse_expression_p3(lex)
+    parse_expression_p7(lex)
 }
 
 fn parse_if_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
@@ -357,19 +439,83 @@ pub fn parse(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> P
     }
 }
 
-
-
-pub fn test() {
-    let code = "
-        fun test1(test,test2) {
-        }";
-    let mut lex = lexer::Token::lexer(code).peekable();
-    println!("{:?}", parse(&mut lex));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use logos::Logos;
+
+    #[test]
+    fn parser_expression_and_or_1() {
+        let code = "1 && 2 || 3;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::LogicOr(Box::new((Expression::LogicAnd(Box::new((Expression::Number(1), Expression::Number(2)))), Expression::Number(3))))))
+    }
+
+    #[test]
+    fn parser_expression_and_or_2() {
+        let code = "3 || 1 && 2;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::LogicOr(Box::new((Expression::Number(3), Expression::LogicAnd(Box::new((Expression::Number(1), Expression::Number(2)))))))))
+    }
+
+    #[test]
+    fn parser_expression_or() {
+        let code = "1 || 2;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::LogicOr(Box::new((Expression::Number(1), Expression::Number(2))))))
+    }
+
+    #[test]
+    fn parser_expression_and() {
+        let code = "1 && 2;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::LogicAnd(Box::new((Expression::Number(1), Expression::Number(2))))))
+    }
+
+    #[test]
+    fn parser_expression_equals_and_not_equals() {
+        let code = "1 == 2 != 3;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        //println!("{:?}", parse_expression(&mut lex))
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::NotEquals(Box::new((Expression::Equals(Box::new((Expression::Number(1), Expression::Number(2)))), Expression::Number(3))))))
+    }
+
+    #[test]
+    fn parser_expression_equals() {
+        let code = "1 == 2;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Equals(Box::new((Expression::Number(1), Expression::Number(2))))))
+    }
+
+    #[test]
+    fn parser_expression_less_and_greater() {
+        let code = "1 < 2 > 3;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Greater(Box::new((Expression::Less(Box::new((Expression::Number(1), Expression::Number(2)))), Expression::Number(3))))))
+    }
+
+    #[test]
+    fn parser_expression_less() {
+        let code = "1 < 2;";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert_eq!(parse_expression(&mut lex), Ok(Expression::Less(Box::new((Expression::Number(1), Expression::Number(2))))))
+    }
+
+
+    #[test]
+    fn parser_prog_1() {
+        let code = "
+        fun main(){}
+
+        fun test1(a,b){}
+
+        fun test2(a,b){
+            a = 1 + 5;
+        }
+        ";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        assert!(parse(&mut lex).is_ok())
+    }
 
     #[test]
     fn parser_function_with_args() {

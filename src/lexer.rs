@@ -66,6 +66,9 @@ pub enum Token {
     #[token("==")]
     Equals,
 
+    #[token("!=")]
+    NotEquals,
+
     #[token(">")]
     Greater,
 
@@ -73,10 +76,10 @@ pub enum Token {
     GreaterEquals,
 
     #[token("<")]
-    Smaller,
+    Less,
 
     #[token("<=")]
-    SmallerEquals,
+    LessEquals,
 
     #[token("+")]
     Addition,
@@ -98,28 +101,9 @@ pub enum Token {
 
 }
 
-
-
-pub fn hello() {
-    let code = "
-        fun test1() {
-            test2();
-        }";
-    let mut lex = Token::lexer(code);
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
-    println!("{:?}", lex.next());
+// use this function to lex the code
+pub fn lex(code: &str) -> std::iter::Peekable<logos::Lexer<'_, Token>> {
+    Token::lexer(code).peekable()
 }
 
 
