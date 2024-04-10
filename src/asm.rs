@@ -1,10 +1,14 @@
 use iced_x86::code_asm::*;
 use iced_x86::Instruction;
+mod lifetime;
 use crate::memory::{self, Executable, Memory, Writeable};
 use crate::ir;
+use crate::parser;
 
 #[allow(dead_code)]
-pub fn generate(instructions: &Vec<ir::IrInstruction>) -> Result<Vec<Instruction>, IcedError> {
+pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Parameters) -> Result<Vec<Instruction>, IcedError> {
+    let mut lifetime_checker = lifetime::get_checker(instructions, parameters);
+    lifetime_checker.print_all();
     let mut a = CodeAssembler::new(64)?;
 
     Ok(a.take_instructions())

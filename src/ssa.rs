@@ -1,8 +1,8 @@
 //single static assignment
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use itertools;
-use crate::parser::{self, Program, VariableName};
+use crate::parser::{self, VariableName};
 
 struct VariableTracker {
     vars: HashMap<String, u64>

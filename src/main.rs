@@ -1,7 +1,9 @@
+use crate::asm::generate;
+
 mod lexer;
 mod parser;
 mod semantic;
-mod asm_generator;
+mod asm;
 mod memory;
 mod ir;
 mod ssa;
@@ -19,5 +21,8 @@ fn main() {
     let program = parser::parse(&mut lexer::lex(code)).unwrap();
     semantic::check(&program).unwrap();
     let program_ssa = ssa::convert(&program);
-    println!("{:?}", ir::transform(&program_ssa.functions[0]))
+    let function = &program_ssa.functions[0];
+    let ir = ir::transform(function);
+    println!("{:?}", ir);
+    println!("{:?}", asm::generate(&ir, &function.parameters));
 }
