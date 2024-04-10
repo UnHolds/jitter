@@ -1,6 +1,4 @@
-use nom::Err;
-
-use crate::parser::{self, Expression, Function, Program, Statement};
+use crate::parser::{self, Expression, Statement};
 
 #[derive(Debug, PartialEq)]
 pub enum SemanticError {
@@ -44,10 +42,6 @@ fn check_duplicate_functions(program: &parser::Program) -> SemanticResult {
         }
     }
     Ok(())
-}
-
-fn unbox<T>(value: &Box<T>) -> &T {
-    &**value
 }
 
 fn contains_var(vars: &Vec<Vec<String>>, var: String) -> bool{

@@ -1,8 +1,13 @@
 mod lexer;
 mod parser;
 mod semantic;
+mod asm_generator;
+mod memory;
 
 fn main() {
+
+    println!("{:?}", asm_generator::test());
+    return;
     let code = "
     fun main(a,b,a) {
     }

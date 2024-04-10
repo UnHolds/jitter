@@ -19,7 +19,7 @@ impl std::fmt::Display for ParseError {
             Self::TooFewTokens =>
                 write!(f, "Too few tokens"),
             Self::LexingError(e) =>
-            write!(f, "Lexing error"),
+            write!(f, "Lexing error: {:?}", e),
         }
     }
 }
