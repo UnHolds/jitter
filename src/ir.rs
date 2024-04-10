@@ -31,7 +31,7 @@ impl NameFactory {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Data {
     Variable(String),
     Number(i64),
@@ -197,7 +197,7 @@ fn transform_function_call(function_call: &parser::FunctionCall, name_factory: &
         instructions.append(&mut inst);
     }
 
-    instructions.push(IrInstruction::FunctionCall(name_factory.get_label(), function_call.name.to_owned(), arguments));
+    instructions.push(IrInstruction::FunctionCall(name_factory.get_variable(), function_call.name.to_owned(), arguments));
 
     instructions
 }
@@ -221,4 +221,64 @@ fn transform_block(block: &parser::Block, name_factory: &mut NameFactory) -> Vec
 
 pub fn transform(function: &parser::Function) -> Vec<IrInstruction> {
     transform_block(&function.block, &mut NameFactory::new())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer;
+
+    #[test]
+    fn ir_test_assignment() {
+        let code = "
+            fun test() {
+                a = 1;
+            }
+        ";
+        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let ir = transform(&prog.functions[0]);
+        assert_eq!(ir, [IrInstruction::Assignment("a".to_owned(), Data::Number(1))])
+    }
+
+    #[test]
+    fn ir_test_function_call() {
+        let code = "
+            fun test() {
+                abc();
+            }
+        ";
+        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let ir = transform(&prog.functions[0]);
+        assert_eq!(ir, [IrInstruction::FunctionCall("#var1".to_owned(), "abc".to_owned(), vec![])])
+        //println!("{:?}", ir);
+    }
+
+    #[test]
+    fn ir_test_if_statement() {
+        let code = "
+            fun test() {
+                if(1){
+                    if(2){
+
+                    }
+                }
+            }
+        ";
+        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let ir = transform(&prog.functions[0]);
+        assert_eq!(ir, [IrInstruction::JumpFalse(Data::Number(1), "#label1".to_owned()), IrInstruction::JumpFalse(Data::Number(2), "#label2".to_owned()), IrInstruction::Label("#label2".to_owned()), IrInstruction::Label("#label1".to_owned())])
+    }
+
+    #[test]
+    fn ir_test_function_call_with_expressions_as_arguments_and_assignment() {
+        let code = "
+            fun test() {
+                c = abc(a, 1, 3 && 4, b);
+            }
+        ";
+        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let ir = transform(&prog.functions[0]);
+        assert_eq!(ir, [IrInstruction::LogicAnd("#var5".to_owned(), Data::Number(3), Data::Number(4)), IrInstruction::FunctionCall("#var2".to_owned(), "abc".to_owned(), [Data::Variable("a".to_owned()), Data::Number(1), Data::Variable("#var5".to_owned()), Data::Variable("b".to_owned())].to_vec()), IrInstruction::Assignment("c".to_owned(), Data::Variable("#var2".to_owned()))])
+    }
 }

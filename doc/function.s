@@ -9,7 +9,7 @@ test:
 	movq	%rsp, %rbp
 	.seh_setframe	%rbp, 0
 	.seh_endprologue
-	nop
+	movl	$0, %eax
 	popq	%rbp
 	ret
 	.seh_endproc
