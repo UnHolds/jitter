@@ -1,14 +1,21 @@
 use iced_x86::code_asm::*;
 use iced_x86::Instruction;
 mod lifetime;
+mod var_allocator;
 use crate::memory::{self, Executable, Memory, Writeable};
 use crate::ir;
 use crate::parser;
 
+
+
 #[allow(dead_code)]
 pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Parameters) -> Result<Vec<Instruction>, IcedError> {
     let mut lifetime_checker = lifetime::get_checker(instructions, parameters);
+    let mut variable_allocator = var_allocator::VariableAllocator::new(parameters, &mut lifetime_checker);
     lifetime_checker.print_all();
+    variable_allocator.print_allocated();
+    variable_allocator.allocate("#var_4", 2, &mut lifetime_checker);
+    variable_allocator.print_allocated();
     let mut a = CodeAssembler::new(64)?;
 
     Ok(a.take_instructions())

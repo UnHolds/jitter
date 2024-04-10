@@ -20,17 +20,27 @@ impl LifetimeChecker {
     }
 
     pub fn print_all(&mut self) {
+        println!("\nLifetime-Checker:");
         for lifetime in &self.lifetimes {
             println!("Var: {} - Start: {}, End: {}", lifetime.name, lifetime.start, lifetime.end);
         }
     }
 
     pub fn get_start_lifetime(&mut self, name: &str) -> i64 {
-        self.lifetimes.iter().find(|l| l.name == name).unwrap().start.to_owned()
+        let lifetime_option = self.lifetimes.iter().find(|l| l.name == name);
+        if lifetime_option.is_none() {
+            panic!("Trying to get start-lifetime of non-existant variable: {}", name);
+        }
+        lifetime_option.unwrap().start.to_owned()
+
     }
 
     pub fn get_end_lifetime(&mut self, name: &str) -> i64 {
-        self.lifetimes.iter().find(|l| l.name == name).unwrap().end.to_owned()
+        let lifetime_option = self.lifetimes.iter().find(|l| l.name == name);
+        if lifetime_option.is_none() {
+            panic!("Trying to get end-lifetime of non-existant variable: {}", name);
+        }
+        lifetime_option.unwrap().end.to_owned()
     }
 
     fn set_start_lifetime(&mut self, name: String, line: i64) {

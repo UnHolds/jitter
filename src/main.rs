@@ -1,5 +1,3 @@
-use crate::asm::generate;
-
 mod lexer;
 mod parser;
 mod semantic;
