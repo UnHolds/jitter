@@ -3,22 +3,18 @@ mod parser;
 mod semantic;
 mod asm_generator;
 mod memory;
+mod ir;
 
 fn main() {
 
-    println!("{:?}", asm_generator::test());
-    return;
+    //println!("{:?}", asm_generator::test());
+    //return;
     let code = "
     fun main(a,b,a) {
+        a = 1 && 2;
     }
     ";
-    let program = parser::parse(&mut lexer::lex(code));
-    match program {
-        Ok(p) => {
-            println!("{:?}",semantic::check(&p));
-            println!("{:?}", p);
-        },
-        Err(e) => println!("{:?}", e)
-    }
+    let program = parser::parse(&mut lexer::lex(code)).unwrap();
+    println!("{:?}", ir::transform(&program.functions[0]))
 
 }
