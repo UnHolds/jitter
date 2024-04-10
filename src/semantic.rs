@@ -1,10 +1,13 @@
-use crate::parser::{self, Expression, Function, Program};
+use nom::Err;
+
+use crate::parser::{self, Expression, Function, Program, Statement};
 
 #[derive(Debug, PartialEq)]
 pub enum SemanticError {
     DuplicateParameter(String),
     DuplicateFunction(String),
-    VariableUsedBeforeInit
+    VariableUsedBeforeInit,
+    FunctionDoesNotExist(String)
 }
 
 type SemanticResult = Result<(), SemanticError>;
@@ -18,6 +21,8 @@ impl std::fmt::Display for SemanticError {
             write!(f, "duplicated function: {}", fun),
             Self::VariableUsedBeforeInit =>
             write!(f, "variable used before init"),
+            Self::FunctionDoesNotExist(fun) =>
+            write!(f, "function does not exist: {}", fun),
         }
     }
 }
@@ -171,12 +176,122 @@ fn check_variable_use_before_init(known_vars: &mut Vec<Vec<String>>, block: &par
     Ok(())
 }
 
+fn check_if_function_exist_in_expression(delcared_functions: &Vec<String>, expression: &Expression) -> SemanticResult {
+    match expression {
+        Expression::Number(_) => Ok(()),
+        Expression::Variable(_) => Ok(()),
+        Expression::FunctionCall(fc) => {
+            if delcared_functions.contains(&fc.name) == false {
+                return Err(SemanticError::FunctionDoesNotExist(fc.name.to_owned()));
+            }
+            for arg in &fc.arguments {
+                check_if_function_exist_in_expression(delcared_functions, arg)?;
+            }
+            Ok(())
+        },
+        Expression::Addition(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Subtraction(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Multiplication(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Division(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Modulo(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Greater(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::GreaterEquals(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Less(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::LessEquals(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::Equals(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::NotEquals(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::LogicAnd(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+        Expression::LogicOr(b) => {
+            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
+            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            Ok(())
+        },
+    }
+}
+
+
+fn check_if_function_exist_on_call(delcared_functions: &Vec<String>, block: &parser::Block) -> SemanticResult {
+    for statement in block {
+        match statement {
+            Statement::FunctionCall(f) => {
+                if delcared_functions.contains(&f.name) {
+                    return Ok(())
+                }else{
+                    return Err(SemanticError::FunctionDoesNotExist(f.name.to_owned()))
+                }
+            },
+            Statement::Assignment(a) => {
+                check_if_function_exist_in_expression(delcared_functions, &a.expression)?;
+            },
+            Statement::IfStatement(s) => {
+                check_if_function_exist_in_expression(delcared_functions, &s.condition)?;
+                check_if_function_exist_on_call(delcared_functions, &s.block)?
+            },
+            Statement::WhileLoop(l) => {
+                check_if_function_exist_in_expression(delcared_functions, &l.condition)?;
+                check_if_function_exist_on_call(delcared_functions, &l.block)?
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn check(program: &parser::Program) -> SemanticResult {
     check_duplicate_functions(program)?;
+    let declared_function_names = program.functions.iter().map(|f| f.name.to_owned()).collect();
     for function in &program.functions {
         check_duplicate_parameters(function)?;
         let mut vars = vec![function.parameters.clone()];
         check_variable_use_before_init(&mut vars, &function.block)?;
+        check_if_function_exist_on_call(&declared_function_names, &function.block)?;
     }
     Ok(())
 }
@@ -189,10 +304,34 @@ mod tests {
     use logos::Logos;
 
     #[test]
+    fn check_non_existant_function_expression() {
+        let code = "
+        fun main() {
+            a = 1 && test();
+        }
+        ";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        let program = parser::parse(&mut lex).unwrap();
+        assert!(check(&program).is_err_and(|e| e == SemanticError::FunctionDoesNotExist("test".to_owned())))
+    }
+
+    #[test]
+    fn check_non_existant_function_statement() {
+        let code = "
+        fun main() {
+            test();
+        }
+        ";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        let program = parser::parse(&mut lex).unwrap();
+        assert!(check(&program).is_err_and(|e| e == SemanticError::FunctionDoesNotExist("test".to_owned())))
+    }
+
+    #[test]
     fn check_use_before_init() {
         let code = "
         fun main() {
-            b = a;
+            a = b;
         }
         ";
         let mut lex = lexer::Token::lexer(code).peekable();
