@@ -96,7 +96,7 @@ pub enum Expression {
     NotEquals(Box<(Expression, Expression)>),
     LogicAnd(Box<(Expression, Expression)>),
     LogicOr(Box<(Expression, Expression)>),
-    FunctionCall(FunctionCall)
+    FunctionCall(FunctionCall),
 }
 
 #[derive(Debug, PartialEq)]
@@ -104,7 +104,8 @@ pub enum Statement {
     Assignment(Assignment),
     IfStatement(IfStatement),
     WhileLoop(WhileLoop),
-    FunctionCall(FunctionCall)
+    FunctionCall(FunctionCall),
+    PhiNode(VariableName, VariableName, VariableName)
 }
 
 #[derive(Debug, PartialEq)]

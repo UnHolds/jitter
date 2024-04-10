@@ -1,7 +1,7 @@
 //intermidiate representation
 
-use crate::parser::{self, Expression};
-
+use crate::parser::{self, Expression, VariableName};
+use crate::ssa;
 pub type Label = String;
 pub type Function = String;
 pub type ResultVariable = String;
@@ -22,12 +22,12 @@ impl NameFactory {
 
     pub fn get_label(&mut self) -> String {
         self.count_label += 1;
-        return format!("#label{}", self.count_label)
+        return format!("#label_{}", self.count_label)
     }
 
     pub fn get_variable(&mut self) -> String {
         self.count_var += 1;
-        return format!("#var{}", self.count_var)
+        return format!("#var_{}", self.count_var)
     }
 }
 
@@ -56,7 +56,8 @@ pub enum IrInstruction {
     NotEquals(ResultVariable, Data, Data),
     LogicAnd(ResultVariable, Data, Data),
     LogicOr(ResultVariable, Data, Data),
-    Assignment(ResultVariable, Data)
+    Assignment(ResultVariable, Data),
+    PhiNode(ResultVariable, VariableName, VariableName)
 }
 
 fn handle_binary_expression(b: &Box<(Expression, Expression)> , name_factory: &mut NameFactory) -> (Data, Data, Vec<IrInstruction>) {
@@ -202,12 +203,18 @@ fn transform_function_call(function_call: &parser::FunctionCall, name_factory: &
     instructions
 }
 
+
 fn transform_statement(statement: &parser::Statement, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     match statement {
         parser::Statement::Assignment(a) => transform_assignment(a, name_factory),
         parser::Statement::IfStatement(s) => transform_if_statement(s, name_factory),
         parser::Statement::FunctionCall(f) => transform_function_call(f, name_factory),
-        parser::Statement::WhileLoop(l) => transform_while_loop(l, name_factory)
+        parser::Statement::WhileLoop(l) => transform_while_loop(l, name_factory),
+        parser::Statement::PhiNode(res_var, var1, var2) => {
+            let mut instructions: Vec<IrInstruction> = vec![];
+            instructions.push(IrInstruction::PhiNode(res_var.to_owned(),var1.to_owned(),var2.to_owned()));
+            instructions
+        }
     }
 }
 
@@ -219,7 +226,7 @@ fn transform_block(block: &parser::Block, name_factory: &mut NameFactory) -> Vec
     instructions
 }
 
-pub fn transform(function: &parser::Function) -> Vec<IrInstruction> {
+pub fn transform(function: &ssa::SsaFunction) -> Vec<IrInstruction> {
     transform_block(&function.block, &mut NameFactory::new())
 }
 
@@ -236,9 +243,9 @@ mod tests {
                 a = 1;
             }
         ";
-        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let prog = ssa::convert(&parser::parse(&mut lexer::lex(&code)).unwrap());
         let ir = transform(&prog.functions[0]);
-        assert_eq!(ir, [IrInstruction::Assignment("a".to_owned(), Data::Number(1))])
+        assert_eq!(ir, [IrInstruction::Assignment("#var_a_#0".to_owned(), Data::Number(1))])
     }
 
     #[test]
@@ -248,10 +255,9 @@ mod tests {
                 abc();
             }
         ";
-        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let prog = ssa::convert(&parser::parse(&mut lexer::lex(&code)).unwrap());
         let ir = transform(&prog.functions[0]);
-        assert_eq!(ir, [IrInstruction::FunctionCall("#var1".to_owned(), "abc".to_owned(), vec![])])
-        //println!("{:?}", ir);
+        assert_eq!(ir, [IrInstruction::FunctionCall("#var_1".to_owned(), "abc".to_owned(), vec![])])
     }
 
     #[test]
@@ -265,9 +271,9 @@ mod tests {
                 }
             }
         ";
-        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let prog = ssa::convert(&parser::parse(&mut lexer::lex(&code)).unwrap());
         let ir = transform(&prog.functions[0]);
-        assert_eq!(ir, [IrInstruction::JumpFalse(Data::Number(1), "#label1".to_owned()), IrInstruction::JumpFalse(Data::Number(2), "#label2".to_owned()), IrInstruction::Label("#label2".to_owned()), IrInstruction::Label("#label1".to_owned())])
+        assert_eq!(ir, [IrInstruction::JumpFalse(Data::Number(1), "#label_1".to_owned()), IrInstruction::JumpFalse(Data::Number(2), "#label_2".to_owned()), IrInstruction::Label("#label_2".to_owned()), IrInstruction::Label("#label_1".to_owned())])
     }
 
     #[test]
@@ -277,8 +283,8 @@ mod tests {
                 c = abc(a, 1, 3 && 4, b);
             }
         ";
-        let prog = parser::parse(&mut lexer::lex(&code)).unwrap();
+        let prog = ssa::convert(&parser::parse(&mut lexer::lex(&code)).unwrap());
         let ir = transform(&prog.functions[0]);
-        assert_eq!(ir, [IrInstruction::LogicAnd("#var5".to_owned(), Data::Number(3), Data::Number(4)), IrInstruction::FunctionCall("#var2".to_owned(), "abc".to_owned(), [Data::Variable("a".to_owned()), Data::Number(1), Data::Variable("#var5".to_owned()), Data::Variable("b".to_owned())].to_vec()), IrInstruction::Assignment("c".to_owned(), Data::Variable("#var2".to_owned()))])
+        assert_eq!(ir, [IrInstruction::LogicAnd("#var_5".to_owned(), Data::Number(3), Data::Number(4)), IrInstruction::FunctionCall("#var_2".to_owned(), "abc".to_owned(), [Data::Variable("#var_a_#0".to_owned()), Data::Number(1), Data::Variable("#var_5".to_owned()), Data::Variable("#var_b_#0".to_owned())].to_vec()), IrInstruction::Assignment("#var_c_#0".to_owned(), Data::Variable("#var_2".to_owned()))])
     }
 }
