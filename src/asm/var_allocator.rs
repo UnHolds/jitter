@@ -1,8 +1,6 @@
 
 
 use core::fmt;
-use std::panic::Location;
-
 use iced_x86::code_asm::*;
 use crate::parser;
 
@@ -131,5 +129,9 @@ impl VariableAllocator {
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
             location
         }
+    }
+
+    pub fn get_number_of_stack_variable(&mut self) -> i64 {
+        (self.next_stack_variable_offset - 8) / 8
     }
 }

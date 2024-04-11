@@ -19,11 +19,9 @@ Division = Expression Expression
 Modulo = Expression Expression
 
 TODO
-* >= <= > <
-* == !=
-* &&
-* ||
-Predecende
+
+- Semantic check if num or args is okay
+  Predecende
 
 1. parenthesis
 2. muliplication division modulo
