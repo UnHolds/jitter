@@ -56,8 +56,7 @@ pub enum IrInstruction {
     NotEquals(ResultVariable, Data, Data),
     LogicAnd(ResultVariable, Data, Data),
     LogicOr(ResultVariable, Data, Data),
-    Assignment(ResultVariable, Data),
-    PhiNode(ResultVariable, VariableName, VariableName)
+    Assignment(ResultVariable, Data)
 }
 
 fn handle_binary_expression(b: &Box<(Expression, Expression)> , name_factory: &mut NameFactory) -> (Data, Data, Vec<IrInstruction>) {
@@ -153,18 +152,29 @@ fn transform_expression(expression: &parser::Expression, name_factory: &mut Name
     }
 }
 
-fn transform_if_statement(if_statement: &parser::IfStatement, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_if_statement(if_statement: &ssa::SsaIfStatement, phi_nodes: &ssa::PhiNodes, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
     let (result, mut condition_ir) = transform_expression(&if_statement.condition, name_factory);
     instructions.append(&mut condition_ir);
-    let end_if_lable = &name_factory.get_label();
-    instructions.push(IrInstruction::JumpFalse(result, end_if_lable.to_owned()));
+    let false_if_label = &name_factory.get_label();
+    let true_if_label = &name_factory.get_label();
+    instructions.push(IrInstruction::JumpFalse(result, false_if_label.to_owned()));
     instructions.append(&mut transform_block(&if_statement.block, name_factory));
-    instructions.push(IrInstruction::Label(end_if_lable.to_owned()));
+    //fix inner phi nodes
+    for phi in phi_nodes{
+        instructions.push(IrInstruction::Assignment(phi.result_var.to_owned(), Data::Variable(phi.inner_option.to_owned())));
+    }
+    instructions.push(IrInstruction::Jump(true_if_label.to_owned()));
+    instructions.push(IrInstruction::Label(false_if_label.to_owned()));
+    //fix outer phi nodes
+    for phi in phi_nodes{
+        instructions.push(IrInstruction::Assignment(phi.result_var.to_owned(), Data::Variable(phi.outer_option.to_owned())));
+    }
+    instructions.push(IrInstruction::Label(true_if_label.to_owned()));
     instructions
 }
 
-fn transform_assignment(assignment: &parser::Assignment, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_assignment(assignment: &ssa::SsaAssignment, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
     let (result, mut expression_ir) = transform_expression(&assignment.expression, name_factory);
     instructions.append(&mut expression_ir);
@@ -172,24 +182,40 @@ fn transform_assignment(assignment: &parser::Assignment, name_factory: &mut Name
     instructions
 }
 
-fn transform_while_loop(while_loop: &parser::WhileLoop, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNodes, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
-    let start_loop_lable = &name_factory.get_label();
-    let end_loop_lable = &name_factory.get_label();
-
-    instructions.push(IrInstruction::Label(start_loop_lable.to_owned()));
+    let start_loop_label = &name_factory.get_label();
+    let end_loop_label = &name_factory.get_label();
+    let init_false_loop_label = &name_factory.get_label();
+    let inner_loop_label = &name_factory.get_label();
+    let total_end_label = &name_factory.get_label();
 
     let (result, mut condition_ir) = transform_expression(&while_loop.condition, name_factory);
     instructions.append(&mut condition_ir);
-
-    instructions.push(IrInstruction::JumpFalse(result, end_loop_lable.to_owned()));
+    instructions.push(IrInstruction::JumpFalse(result.clone(), init_false_loop_label.to_owned()));
+    instructions.push(IrInstruction::Jump(inner_loop_label.to_owned()));
+    instructions.push(IrInstruction::Label(start_loop_label.to_owned()));
+    instructions.append(&mut condition_ir);
+    instructions.push(IrInstruction::JumpFalse(result, end_loop_label.to_owned()));
+    instructions.push(IrInstruction::Label(inner_loop_label.to_owned()));
     instructions.append(&mut transform_block(&while_loop.block, name_factory));
-    instructions.push(IrInstruction::Jump(start_loop_lable.to_owned()));
-    instructions.push(IrInstruction::Label(end_loop_lable.to_owned()));
+    instructions.push(IrInstruction::Jump(start_loop_label.to_owned()));
+    instructions.push(IrInstruction::Label(init_false_loop_label.to_owned()));
+    //outer nodes
+    for phi in phi_nodes {
+        instructions.push(IrInstruction::Assignment(phi.result_var.to_owned(), Data::Variable(phi.outer_option.to_owned())));
+    }
+    instructions.push(IrInstruction::Jump(total_end_label.to_owned()));
+    instructions.push(IrInstruction::Label(end_loop_label.to_owned()));
+    //inner nodes
+    for phi in phi_nodes {
+        instructions.push(IrInstruction::Assignment(phi.result_var.to_owned(), Data::Variable(phi.inner_option.to_owned())));
+    }
+    instructions.push(IrInstruction::Label(total_end_label.to_owned()));
     instructions
 }
 
-fn transform_function_call(function_call: &parser::FunctionCall, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_function_call(function_call: &ssa::SsaFunctionCall, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
     let mut arguments: Arguments = vec![];
     for arg in &function_call.arguments {
@@ -204,21 +230,16 @@ fn transform_function_call(function_call: &parser::FunctionCall, name_factory: &
 }
 
 
-fn transform_statement(statement: &parser::Statement, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_statement(statement: &ssa::SsaStatement, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     match statement {
-        parser::Statement::Assignment(a) => transform_assignment(a, name_factory),
-        parser::Statement::IfStatement(s) => transform_if_statement(s, name_factory),
-        parser::Statement::FunctionCall(f) => transform_function_call(f, name_factory),
-        parser::Statement::WhileLoop(l) => transform_while_loop(l, name_factory),
-        parser::Statement::PhiNode(res_var, var1, var2) => {
-            let mut instructions: Vec<IrInstruction> = vec![];
-            instructions.push(IrInstruction::PhiNode(res_var.to_owned(),var1.to_owned(),var2.to_owned()));
-            instructions
-        }
+        ssa::SsaStatement::Assignment(a) => transform_assignment(a, name_factory),
+        ssa::SsaStatement::IfStatement(s, phi) => transform_if_statement(s, phi, name_factory),
+        ssa::SsaStatement::FunctionCall(f) => transform_function_call(f, name_factory),
+        ssa::SsaStatement::WhileLoop(l, phi) => transform_while_loop(l, phi, name_factory),
     }
 }
 
-fn transform_block(block: &parser::Block, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_block(block: &ssa::SsaBlock, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
     for statement in block {
         instructions.append(&mut transform_statement(statement, name_factory));
@@ -273,7 +294,7 @@ mod tests {
         ";
         let prog = ssa::convert(&parser::parse(&mut lexer::lex(&code)).unwrap());
         let ir = transform(&prog.functions[0]);
-        assert_eq!(ir, [IrInstruction::JumpFalse(Data::Number(1), "#label_1".to_owned()), IrInstruction::JumpFalse(Data::Number(2), "#label_2".to_owned()), IrInstruction::Label("#label_2".to_owned()), IrInstruction::Label("#label_1".to_owned())])
+        assert_eq!(ir, [IrInstruction::JumpFalse(Data::Number(1), "#label_1".to_owned()), IrInstruction::JumpFalse(Data::Number(2), "#label_3".to_owned()), IrInstruction::Jump("#label_4".to_owned()), IrInstruction::Label("#label_3".to_owned()), IrInstruction::Label("#label_4".to_owned()), IrInstruction::Jump("#label_2".to_owned()), IrInstruction::Label("#label_1".to_owned()), IrInstruction::Label("#label_2".to_owned())] )
     }
 
     #[test]

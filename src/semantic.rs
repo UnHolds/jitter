@@ -6,7 +6,6 @@ pub enum SemanticError {
     DuplicateFunction(String),
     VariableUsedBeforeInit,
     FunctionDoesNotExist(String),
-    FoundPhiNode
 }
 
 type SemanticResult = Result<(), SemanticError>;
@@ -22,8 +21,6 @@ impl std::fmt::Display for SemanticError {
             write!(f, "variable used before init"),
             Self::FunctionDoesNotExist(fun) =>
             write!(f, "function does not exist: {}", fun),
-            Self::FoundPhiNode =>
-            write!(f, "the AST for the semantic check should not contain phi nodes", ),
         }
     }
 }
@@ -145,7 +142,6 @@ fn check_vars_in_expression(vars: &mut Vec<Vec<String>>, expression: &Expression
 fn check_variable_use_before_init(known_vars: &mut Vec<Vec<String>>, block: &parser::Block) -> SemanticResult {
     for statement in block {
         match statement {
-            parser::Statement::PhiNode(_, _, _) => return Err(SemanticError::FoundPhiNode),
             parser::Statement::Assignment(v) => {
                 check_vars_in_expression(known_vars, &v.expression)?;
                 let mut vars = known_vars.pop().unwrap();
@@ -259,7 +255,6 @@ fn check_if_function_exist_in_expression(delcared_functions: &Vec<String>, expre
 fn check_if_function_exist_on_call(delcared_functions: &Vec<String>, block: &parser::Block) -> SemanticResult {
     for statement in block {
         match statement {
-            parser::Statement::PhiNode(_, _, _) => return Err(SemanticError::FoundPhiNode),
             Statement::FunctionCall(f) => {
                 if delcared_functions.contains(&f.name) {
                     return Ok(())

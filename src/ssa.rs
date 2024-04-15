@@ -96,7 +96,6 @@ fn get_assigned_variables_in_block(block: &parser::Block) -> Vec<VariableName> {
     let mut vars = vec![];
     for statement in block {
         match statement {
-            parser::Statement::PhiNode(_, _, _) => panic!("PhiNodes can't exist before the ssa transformation"),
             parser::Statement::Assignment(a) => vars.push(a.variable_name.to_owned()),
             parser::Statement::FunctionCall(_) => (),
             parser::Statement::IfStatement(s) => {
@@ -110,52 +109,49 @@ fn get_assigned_variables_in_block(block: &parser::Block) -> Vec<VariableName> {
     vars
 }
 
-fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> parser::Block {
+fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> SsaBlock {
     let mut new_block = vec![];
     for statement in block {
         match statement {
-            parser::Statement::PhiNode(_, _, _) => panic!("PhiNodes can't exist before the ssa transformation"),
             parser::Statement::Assignment(a) => {
                 let new_var = var_tracker.get_new(&a.variable_name.to_owned());
                 let new_inner_block = convert_expression(&a.expression, var_tracker);
-                new_block.push(parser::Statement::Assignment(parser::Assignment { variable_name: new_var, expression: new_inner_block }));
+                new_block.push(SsaStatement::Assignment(SsaAssignment { variable_name: new_var, expression: new_inner_block }));
             },
             parser::Statement::FunctionCall(f) => {
                 let mut new_args = vec![];
                 for arg in &f.arguments {
                     new_args.push(convert_expression(arg, var_tracker));
                 }
-                new_block.push(parser::Statement::FunctionCall(parser::FunctionCall { name: f.name.to_owned(), arguments: new_args }));
+                new_block.push(SsaStatement::FunctionCall(SsaFunctionCall { name: f.name.to_owned(), arguments: new_args }));
             },
             parser::Statement::IfStatement(s) => {
                 let new_condition = convert_expression(&s.condition, var_tracker);
                 let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&s.block);
-                let pre_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
+                let outer_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
                 let new_inner_block = convert_block(&s.block, var_tracker);
-                let post_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
+                let inner_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
 
                 let mut phi_nodes = vec![];
-                for (var, pre, post) in itertools::izip!(assigned_vars, pre_var_names, post_var_names) {
-                    phi_nodes.push(parser::Statement::PhiNode(var_tracker.get_new(&var), pre, post))
+                for (var, outer, inner) in itertools::izip!(assigned_vars, outer_var_names, inner_var_names) {
+                    phi_nodes.push(PhiNode {result_var: var_tracker.get_new(&var), inner_option: inner, outer_option: outer})
                 }
 
-                new_block.push(parser::Statement::IfStatement(parser::IfStatement {condition: new_condition, block: new_inner_block}));
-                new_block.append(&mut phi_nodes);
+                new_block.push(SsaStatement::IfStatement(SsaIfStatement {condition: new_condition, block: new_inner_block}, phi_nodes));
             },
             parser::Statement::WhileLoop(l) => {
                 let new_condition = convert_expression(&l.condition, var_tracker);
                 let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&l.block);
-                let pre_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
+                let outer_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
                 let new_inner_block = convert_block(&l.block, var_tracker);
-                let post_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
+                let inner_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
 
                 let mut phi_nodes = vec![];
-                for (var, pre, post) in itertools::izip!(assigned_vars, pre_var_names, post_var_names) {
-                    phi_nodes.push(parser::Statement::PhiNode(var_tracker.get_new(&var), pre, post))
+                for (var, outer, inner) in itertools::izip!(assigned_vars, outer_var_names, inner_var_names) {
+                    phi_nodes.push(PhiNode{result_var: var_tracker.get_new(&var),inner_option: inner, outer_option: outer})
                 }
 
-                new_block.push(parser::Statement::IfStatement(parser::IfStatement {condition: new_condition, block: new_inner_block}));
-                new_block.append(&mut phi_nodes);
+                new_block.push(SsaStatement::WhileLoop(SsaWhileLoop {condition: new_condition, block: new_inner_block}, phi_nodes));
             }
         }
     }
@@ -167,10 +163,53 @@ pub struct SsaProgram {
     pub functions: Vec<SsaFunction>
 }
 
+
+pub type SsaBlock = Vec<SsaStatement>;
+pub type PhiNodes = Vec<PhiNode>;
+
+#[derive(Debug, PartialEq)]
+pub struct PhiNode {
+    pub result_var: VariableName,
+    pub inner_option: VariableName,
+    pub outer_option: VariableName
+}
+
 pub struct SsaFunction {
     pub name: parser::FunctionIdentifier,
     pub parameters: parser::Parameters,
-    pub block: parser::Block
+    pub block: SsaBlock
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SsaAssignment {
+    pub variable_name: VariableName,
+    pub expression: parser::Expression
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SsaIfStatement {
+    pub condition: parser::Expression,
+    pub block: SsaBlock
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SsaWhileLoop {
+    pub condition: parser::Expression,
+    pub block: SsaBlock
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SsaFunctionCall {
+    pub name: parser::FunctionIdentifier,
+    pub arguments: parser::Arguments
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SsaStatement {
+    Assignment(SsaAssignment),
+    IfStatement(SsaIfStatement, PhiNodes),
+    WhileLoop(SsaWhileLoop, PhiNodes),
+    FunctionCall(SsaFunctionCall),
 }
 
 pub fn convert(program: &parser::Program) -> SsaProgram {

@@ -105,7 +105,6 @@ pub enum Statement {
     IfStatement(IfStatement),
     WhileLoop(WhileLoop),
     FunctionCall(FunctionCall),
-    PhiNode(VariableName, VariableName, VariableName)
 }
 
 #[derive(Debug, PartialEq)]

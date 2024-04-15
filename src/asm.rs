@@ -17,27 +17,39 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
     let mut lifetime_checker = lifetime::get_checker(instructions, parameters);
     let mut variable_allocator = var_allocator::VariableAllocator::new(parameters, &mut lifetime_checker);
     let mut a = CodeAssembler::new(64)?;
-    let mut labels = HashMap::new();
+    let mut labels: HashMap<String, CodeLabel> = HashMap::new();
 
     for inst in instructions {
         match inst {
             ir::IrInstruction::Jump(label) => {
-                let l = a.create_label();
-                a.jmp(l)?;
-                labels.insert(label, l);
+                match labels.get_mut(label) {
+                    Some(l) => {
+                        a.jmp(l.to_owned())?;
+                    },
+                    None => panic!("TODO error")
+                }
             }
             ir::IrInstruction::JumpFalse(data, label) => {
                 get_data_in_register(data, rax);
                 a.test(rax, rax)?;
-                let l = a.create_label();
-                a.jz(l)?;
-                labels.insert(label, l);
+                match labels.get_mut(label) {
+                    Some(l) => {
+                        a.jz(l.to_owned())?;
+                    },
+                    None => panic!("TODO error")
+                }
+
             }
             ir::IrInstruction::Label(label) => {
-
+                let mut l = a.create_label();
+                match labels.get(label){
+                    None => labels.insert(label.to_owned(), l),
+                    Some(_) => panic!("TODO error")
+                };
+                a.set_label(&mut l)?;
             }
             ir::IrInstruction::FunctionCall(res_var, fun_name, args) => {
-
+                panic!("Function call not implemented yet (IR)")
             }
             ir::IrInstruction::Addition(res_var, data1, data2) => {
 
@@ -79,9 +91,6 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
 
             }
             ir::IrInstruction::Assignment(res_var, data) => {
-
-            }
-            ir::IrInstruction::PhiNode(res_var, var_name1, var_name2) => {
 
             }
         }
