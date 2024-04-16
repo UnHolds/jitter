@@ -17,7 +17,8 @@ fn main() {
     let program_ssa = ssa::convert(&program);
     let function = &program_ssa.functions[0];
     let ir = ir::transform(function);
-    let is = asm::generate(&ir, &function.parameters).unwrap();
+    let mut function_tracker = asm::FunctionTracker::new();
+    let is = asm::generate(&ir, &function.name, &function.parameters, &mut function_tracker).unwrap();
     let bytes = asm::assemble(&is, 0xdeadbeef).unwrap();
     asm::print_decoded_bytes(&bytes, 0xdeadbeef);
 }

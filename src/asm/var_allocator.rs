@@ -91,7 +91,7 @@ impl VariableAllocator {
         VariableAllocator {
             free_registers,
             variables,
-            next_stack_variable_offset: -8,
+            next_stack_variable_offset: -32,
         }
     }
 

@@ -344,6 +344,11 @@ fn generate_assignment(res_var: &String, data: &ir::Data, line: u64, generator: 
 fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
     let data_loc = get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
     move_to(VariableLocation::Register(rax), data_loc, generator)?;
+    //restore register
+    generator.code_assembler.mov(r12, rbp - 8)?;
+    generator.code_assembler.mov(r13, rbp - 16)?;
+    generator.code_assembler.mov(r14, rbp - 24)?;
+    generator.code_assembler.mov(r15, rbp - 32)?;
     generator.code_assembler.ret()?;
     Ok(())
 }
@@ -355,8 +360,17 @@ pub struct CodeGenerator {
     labels: HashMap<String, CodeLabel>
 }
 
+pub struct FunctionTracker{
+    functions: HashMap<String, CodeLabel>
+}
+impl FunctionTracker {
+    pub fn new() -> Self {
+        FunctionTracker {functions: HashMap::new()}
+    }
+}
+
 #[allow(dead_code)]
-pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Parameters) -> Result<Vec<Instruction>, IcedError> {
+pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters: &parser::Parameters, function_tracker: &mut FunctionTracker) -> Result<Vec<Instruction>, IcedError> {
     let mut _lifetime = lifetime::get_checker(instructions, parameters);
     let mut generator = CodeGenerator {
         code_assembler: CodeAssembler::new(64)?,
@@ -364,6 +378,16 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
         variable_allocator: var_allocator::VariableAllocator::new(parameters, &mut _lifetime),
         lifetime_checker: _lifetime
     };
+
+    let mut label = generator.code_assembler.create_label();
+    generator.code_assembler.set_label(&mut label)?;
+    function_tracker.functions.insert(name.to_owned(), label);
+
+    //save callee registers
+    generator.code_assembler.push(r12)?;
+    generator.code_assembler.push(r13)?;
+    generator.code_assembler.push(r14)?;
+    generator.code_assembler.push(r15)?;
 
 
     for (line, inst) in instructions.iter().enumerate() {
