@@ -1,3 +1,7 @@
+use memory::{Executable, Writeable};
+
+use crate::memory::Memory;
+
 mod lexer;
 mod parser;
 mod semantic;
@@ -8,8 +12,8 @@ mod ssa;
 fn main() {
 
     let code = "
-    fun main(a,b,c) {
-        a = a + 4 * 3;
+    fun main() {
+        return 7;
     }
     ";
     let program = parser::parse(&mut lexer::lex(code)).unwrap();
@@ -21,4 +25,10 @@ fn main() {
     let is = asm::generate(&ir, &function.name, &function.parameters, &mut function_tracker).unwrap();
     let bytes = asm::assemble(&is, 0xdeadbeef).unwrap();
     asm::print_decoded_bytes(&bytes, 0xdeadbeef);
+    let mut memory = memory::ExecuteableMemory::new(bytes.len());
+    println!("Addr: {:?}", memory.address());
+    memory.write(&bytes);
+    println!("Executing!");
+    let f = memory.as_function();
+    println!("Return: {:?}", f());
 }

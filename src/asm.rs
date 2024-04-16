@@ -345,10 +345,15 @@ fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) ->
     let data_loc = get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
     move_to(VariableLocation::Register(rax), data_loc, generator)?;
     //restore register
-    generator.code_assembler.mov(r12, rbp - 8)?;
-    generator.code_assembler.mov(r13, rbp - 16)?;
-    generator.code_assembler.mov(r14, rbp - 24)?;
-    generator.code_assembler.mov(r15, rbp - 32)?;
+    generator.code_assembler.mov(rbx, rbp)?;
+    generator.code_assembler.sub(rbx, 48)?;
+    generator.code_assembler.mov(rsp, rbx)?;
+    generator.code_assembler.pop(r15)?;
+    generator.code_assembler.pop(r14)?;
+    generator.code_assembler.pop(r13)?;
+    generator.code_assembler.pop(r12)?;
+    generator.code_assembler.pop(rbx)?;
+    generator.code_assembler.pop(rbp)?;
     generator.code_assembler.ret()?;
     Ok(())
 }
@@ -384,6 +389,13 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters
     function_tracker.functions.insert(name.to_owned(), label);
 
     //save callee registers
+    generator.code_assembler.push(rbp)?;
+    //fix rbp
+    generator.code_assembler.mov(rax, rsp)?;
+    generator.code_assembler.add(rax, 8)?;
+    generator.code_assembler.mov(rbp, rax)?;
+    //save the rest of the register
+    generator.code_assembler.push(rbx)?;
     generator.code_assembler.push(r12)?;
     generator.code_assembler.push(r13)?;
     generator.code_assembler.push(r14)?;
