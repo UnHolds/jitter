@@ -104,18 +104,19 @@ impl VariableAllocator {
 
     fn check(&mut self, line: u64) {
         for var in &self.variables {
+            if var.lifetime_end >= line || var.location == VariableLocation::Stack(0){
+                continue;
+            }
             match var.location {
                 VariableLocation::Register(r) => self.free_registers.push(r),
                 VariableLocation::Stack(_) => ()
             }
         }
-        self.variables.retain(|v| v.lifetime_end > line || v.location == VariableLocation::Stack(0))
+        self.variables.retain(|v| v.lifetime_end >= line || v.location == VariableLocation::Stack(0));
     }
 
-    pub fn allocate(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker) -> VariableLocation{
-        if self.variables.iter().find(|v| v.name == name).is_some() {
-            panic!("Trying to allocate variable {}, but is already allocatad (violates SSA)!", name);
-        }
+
+    fn allcoate(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker) -> VariableLocation {
         self.check(line);
         let lifetime_end = lifetime_checker.get_end_lifetime(name) as u64;
         if self.free_registers.len() > 0 {
@@ -128,6 +129,13 @@ impl VariableAllocator {
             self.next_stack_variable_offset = self.next_stack_variable_offset - 8;
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
             location
+        }
+    }
+
+    pub fn get(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker) -> VariableLocation {
+        match self.variables.iter().find(|v| v.name == name) {
+            None => self.allcoate(name, line, lifetime_checker),
+            Some(v) => v.location
         }
     }
 

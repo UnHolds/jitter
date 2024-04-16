@@ -7,13 +7,9 @@ mod ir;
 mod ssa;
 fn main() {
 
-    //println!("{:?}", asm_generator::test());
-    //return;
     let code = "
     fun main(a,b,c) {
-        if(1 && 2){
-            a = 2 && 1 + c;
-        }
+        a = a + 4 * 3;
     }
     ";
     let program = parser::parse(&mut lexer::lex(code)).unwrap();
@@ -21,6 +17,7 @@ fn main() {
     let program_ssa = ssa::convert(&program);
     let function = &program_ssa.functions[0];
     let ir = ir::transform(function);
-    println!("{:?}", ir);
-    println!("{:?}", asm::generate(&ir, &function.parameters));
+    let is = asm::generate(&ir, &function.parameters).unwrap();
+    let bytes = asm::assemble(&is, 0xdeadbeef).unwrap();
+    asm::print_decoded_bytes(&bytes, 0xdeadbeef);
 }

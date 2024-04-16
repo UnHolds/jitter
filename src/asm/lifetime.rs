@@ -150,12 +150,7 @@ pub fn get_checker(instructions: &Vec<ir::IrInstruction>, parameters: &parser::P
             ir::IrInstruction::Assignment(res_var, d) => {
                 check_end_lifetime(d, line as i64, &mut checker);
                 checker.set_start_lifetime(res_var.to_owned(), line as i64);
-            },
-            ir::IrInstruction::PhiNode(res_var, var1, var2) => {
-                checker.set_end_lifetime(var1.to_owned(), line as i64);
-                checker.set_end_lifetime(var2.to_owned(), line as i64);
-                checker.set_start_lifetime(res_var.to_owned(), line as i64);
-            },
+            }
         }
     }
 
