@@ -165,6 +165,9 @@ fn check_variable_use_before_init(known_vars: &mut Vec<Vec<String>>, block: &par
                 check_variable_use_before_init(known_vars, &l.block)?;
                 known_vars.pop();
             }
+            parser::Statement::Return(e) => {
+                check_vars_in_expression(known_vars, e)?;
+            }
         }
     }
     Ok(())
@@ -272,6 +275,9 @@ fn check_if_function_exist_on_call(delcared_functions: &Vec<String>, block: &par
             Statement::WhileLoop(l) => {
                 check_if_function_exist_in_expression(delcared_functions, &l.condition)?;
                 check_if_function_exist_on_call(delcared_functions, &l.block)?
+            },
+            Statement::Return(e) => {
+                check_if_function_exist_in_expression(delcared_functions, e)?;
             }
         }
     }

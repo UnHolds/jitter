@@ -105,6 +105,7 @@ pub enum Statement {
     IfStatement(IfStatement),
     WhileLoop(WhileLoop),
     FunctionCall(FunctionCall),
+    Return(Expression)
 }
 
 #[derive(Debug, PartialEq)]
@@ -333,6 +334,13 @@ fn parse_while_loop(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>
     Ok(Statement::WhileLoop(WhileLoop { condition, block }))
 }
 
+fn parse_return(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Statement>{
+    check_token(get_token(lex.next())?, Token::Return)?;
+    let expression = parse_expression(lex)?;
+    check_token(get_token(lex.next())?, lexer::Token::Semicolon)?;
+    Ok(Statement::Return(expression))
+}
+
 fn parse_arguments(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>) -> ParseResult<Arguments>{
     let mut arguments:Arguments = Vec::new();
     loop {
@@ -389,6 +397,7 @@ fn parse_statement(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>
         },
         Token::IfStatement => parse_if_statement(lex),
         Token::WhileLoop => parse_while_loop(lex),
+        Token::Return => parse_return(lex),
         _ => return Err(ParseError::UnexpectedToken2(vec![Token::Identifier("".to_owned()), Token::IfStatement, Token::WhileLoop], token))
     }
 }

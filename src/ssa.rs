@@ -104,6 +104,8 @@ fn get_assigned_variables_in_block(block: &parser::Block) -> Vec<VariableName> {
             parser::Statement::WhileLoop(l) => {
                 vars.append(&mut get_assigned_variables_in_block(&l.block));
             },
+            parser::Statement::Return(_) => ()
+
         }
     }
     vars
@@ -152,6 +154,10 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
                 }
 
                 new_block.push(SsaStatement::WhileLoop(SsaWhileLoop {condition: new_condition, block: new_inner_block}, phi_nodes));
+            },
+            parser::Statement::Return(e) => {
+                let expr = convert_expression(e, var_tracker);
+                new_block.push(SsaStatement::Return(expr))
             }
         }
     }
@@ -210,6 +216,7 @@ pub enum SsaStatement {
     IfStatement(SsaIfStatement, PhiNodes),
     WhileLoop(SsaWhileLoop, PhiNodes),
     FunctionCall(SsaFunctionCall),
+    Return(parser::Expression)
 }
 
 pub fn convert(program: &parser::Program) -> SsaProgram {

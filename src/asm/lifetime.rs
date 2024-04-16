@@ -151,6 +151,7 @@ pub fn get_checker(instructions: &Vec<ir::IrInstruction>, parameters: &parser::P
                 check_end_lifetime(d, line as i64, &mut checker);
                 checker.set_start_lifetime(res_var.to_owned(), line as i64);
             }
+            ir::IrInstruction::Return(d) => check_end_lifetime(d, line as i64, &mut checker),
         }
     }
 

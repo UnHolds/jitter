@@ -56,7 +56,8 @@ pub enum IrInstruction {
     NotEquals(ResultVariable, Data, Data),
     LogicAnd(ResultVariable, Data, Data),
     LogicOr(ResultVariable, Data, Data),
-    Assignment(ResultVariable, Data)
+    Assignment(ResultVariable, Data),
+    Return(Data)
 }
 
 fn handle_binary_expression(b: &Box<(Expression, Expression)> , name_factory: &mut NameFactory) -> (Data, Data, Vec<IrInstruction>) {
@@ -229,6 +230,14 @@ fn transform_function_call(function_call: &ssa::SsaFunctionCall, name_factory: &
     instructions
 }
 
+fn transform_return(expression: &parser::Expression, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+    let mut instructions: Vec<IrInstruction> = vec![];
+    let (res, mut inst) = transform_expression(expression, name_factory);
+    instructions.append(&mut inst);
+    instructions.push(IrInstruction::Return(res));
+    instructions
+}
+
 
 fn transform_statement(statement: &ssa::SsaStatement, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     match statement {
@@ -236,6 +245,7 @@ fn transform_statement(statement: &ssa::SsaStatement, name_factory: &mut NameFac
         ssa::SsaStatement::IfStatement(s, phi) => transform_if_statement(s, phi, name_factory),
         ssa::SsaStatement::FunctionCall(f) => transform_function_call(f, name_factory),
         ssa::SsaStatement::WhileLoop(l, phi) => transform_while_loop(l, phi, name_factory),
+        ssa::SsaStatement::Return(e) =>transform_return(e, name_factory)
     }
 }
 

@@ -96,6 +96,9 @@ pub enum Token {
     #[token("%")]
     Modulo,
 
+    #[token("return")]
+    Return,
+
     #[regex("-?[0-9]+", |lex| lex.slice().parse())]
     Number(i64),
 

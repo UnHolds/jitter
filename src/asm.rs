@@ -4,7 +4,7 @@ use iced_x86::code_asm::*;
 mod lifetime;
 mod var_allocator;
 use crate::memory::{self, Executable, Memory, Writeable};
-use crate::ir::{self, IrInstruction};
+use crate::ir::{self, Data, IrInstruction};
 use crate::parser;
 
 use self::lifetime::LifetimeChecker;
@@ -341,6 +341,13 @@ fn generate_assignment(res_var: &String, data: &ir::Data, line: u64, generator: 
     Ok(())
 }
 
+fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
+    let data_loc = get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
+    move_to(VariableLocation::Register(rax), data_loc, generator);
+    generator.code_assembler.ret()?;
+    Ok(())
+}
+
 pub struct CodeGenerator {
     lifetime_checker: LifetimeChecker,
     variable_allocator: var_allocator::VariableAllocator,
@@ -416,9 +423,14 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
             ir::IrInstruction::Assignment(res_var, data) => {
                 generate_assignment(res_var, data, line as u64, &mut generator)?;
             }
+            ir::IrInstruction::Return(data) => {
+                generate_return(data, line as u64, &mut generator)?;
+            }
         }
     }
 
+    //always return
+    generate_return(&Data::Number(0), 0, &mut generator)?;
 
     Ok(generator.code_assembler.take_instructions())
 }
