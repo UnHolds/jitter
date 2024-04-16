@@ -343,7 +343,7 @@ fn generate_assignment(res_var: &String, data: &ir::Data, line: u64, generator: 
 
 fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
     let data_loc = get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
-    move_to(VariableLocation::Register(rax), data_loc, generator);
+    move_to(VariableLocation::Register(rax), data_loc, generator)?;
     generator.code_assembler.ret()?;
     Ok(())
 }
@@ -472,7 +472,7 @@ pub fn print_decoded_bytes(bytes: &Vec<u8>, rip: u64) {
 pub fn assemble(instructions: &Vec<Instruction>, ip: u64) -> Result<Vec<u8>, IcedError> {
     let mut a = CodeAssembler::new(64)?;
     for inst in instructions {
-        a.add_instruction(inst.to_owned());
+        a.add_instruction(inst.to_owned())?;
     }
     Ok(a.assemble(ip)?)
 }
