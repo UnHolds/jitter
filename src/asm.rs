@@ -63,7 +63,11 @@ fn generate_jump(label: &String, generator: &mut CodeGenerator) -> Result<(), Ic
         Some(l) => {
             generator.code_assembler.jmp(l.to_owned())?;
         },
-        None => panic!("TODO error")
+        None => {
+            let l = generator.code_assembler.create_label();
+            generator.code_assembler.jmp(l)?;
+            generator.labels.insert(label.to_owned(), l);
+        }
     };
     Ok(())
 }
@@ -81,22 +85,32 @@ fn generate_jump_false(data: &ir::Data, label: &String, line: u64,  generator: &
             generator.code_assembler.test(rax, rax)?;
         }
     }
+
     match  generator.labels.get_mut(label) {
         Some(l) => {
             generator.code_assembler.jz(l.to_owned())?;
         },
-        None => panic!("TODO error")
+        None => {
+            let l = generator.code_assembler.create_label();
+            generator.code_assembler.jz(l)?;
+            generator.labels.insert(label.to_owned(), l);
+        }
     };
     Ok(())
 }
 
 fn generate_label(label: &String, generator: &mut CodeGenerator) -> Result<(), IcedError> {
-    let mut l = generator.code_assembler.create_label();
-    match generator.labels.get(label){
-        None => generator.labels.insert(label.to_owned(), l),
-        Some(_) => panic!("TODO error")
+    generator.code_assembler.nop()?;
+    match generator.labels.get_mut(label){
+        None => {
+            let mut l = generator.code_assembler.create_label();
+            generator.labels.insert(label.to_owned(), l);
+            generator.code_assembler.set_label(&mut l)?;
+        },
+        Some(l) => {
+            generator.code_assembler.set_label(l)?;
+        }
     };
-    generator.code_assembler.set_label(&mut l)?;
     Ok(())
 }
 

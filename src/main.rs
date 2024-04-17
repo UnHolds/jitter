@@ -17,7 +17,9 @@ fn main() {
         return test(4) + test(5);
     }
     fun test(a) {
-        return 5 + a;
+        if (a > 4){
+            return 5 + a;
+        }
     }
     ";
     let program = parser::parse(&mut lexer::lex(code)).unwrap();
