@@ -1,8 +1,8 @@
 //single static assignment
 
 use std::collections::HashMap;
-use itertools;
-use crate::parser::{self, VariableName};
+use itertools::{self, Itertools};
+use crate::parser::{self, Assignment, VariableName};
 
 struct VariableTracker {
     vars: HashMap<String, u64>
@@ -111,6 +111,76 @@ fn get_assigned_variables_in_block(block: &parser::Block) -> Vec<VariableName> {
     vars
 }
 
+fn get_ref_vars_expression(expression: &parser::Expression) -> Vec<String>{
+
+    let mut ref_vars = vec![];
+
+    match expression {
+        parser::Expression::Number(n) => (),
+        parser::Expression::Variable(v) => {
+            ref_vars.push(v.to_owned());
+        },
+        parser::Expression::FunctionCall(fc) => {
+            for arg in &fc.arguments {
+                ref_vars.append(&mut get_ref_vars_expression(arg));
+            }
+        },
+        parser::Expression::Addition(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Subtraction(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Multiplication(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Division(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Modulo(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Greater(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::GreaterEquals(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Less(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::LessEquals(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::Equals(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::NotEquals(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::LogicAnd(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+        parser::Expression::LogicOr(b) => {
+            ref_vars.append(&mut get_ref_vars_expression(&b.0));
+            ref_vars.append(&mut get_ref_vars_expression(&b.1));
+        },
+    }
+    ref_vars.iter().unique().cloned().collect()
+}
+
 fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> SsaBlock {
     let mut new_block = vec![];
     for statement in block {
@@ -147,13 +217,18 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
                 let outer_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
                 let new_inner_block = convert_block(&l.block, var_tracker);
                 let inner_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
-
+                let ref_vars_condition = get_ref_vars_expression(&new_condition);
                 let mut phi_nodes = vec![];
+                let mut loop_phi_nodes = vec![];
                 for (var, outer, inner) in itertools::izip!(assigned_vars, outer_var_names, inner_var_names) {
-                    phi_nodes.push(PhiNode{result_var: var_tracker.get_new(&var),inner_option: inner, outer_option: outer})
+                    if ref_vars_condition.contains(&outer) {
+                        loop_phi_nodes.push(LoopPhiNode{condition_var: outer.to_owned(), inner_var: inner.to_owned()});
+                    }
+                    phi_nodes.push(PhiNode{result_var: var_tracker.get_new(&var),inner_option: inner, outer_option: outer});
+
                 }
 
-                new_block.push(SsaStatement::WhileLoop(SsaWhileLoop {condition: new_condition, block: new_inner_block}, phi_nodes));
+                new_block.push(SsaStatement::WhileLoop(SsaWhileLoop {condition: new_condition, block: new_inner_block}, phi_nodes, loop_phi_nodes));
             },
             parser::Statement::Return(e) => {
                 let expr = convert_expression(e, var_tracker);
@@ -212,10 +287,18 @@ pub struct SsaFunctionCall {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct LoopPhiNode {
+    pub condition_var: String,
+    pub inner_var: String
+}
+
+pub type LoopPhiNodes = Vec<LoopPhiNode>;
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SsaStatement {
     Assignment(SsaAssignment),
     IfStatement(SsaIfStatement, PhiNodes),
-    WhileLoop(SsaWhileLoop, PhiNodes),
+    WhileLoop(SsaWhileLoop, PhiNodes, LoopPhiNodes),
     FunctionCall(SsaFunctionCall),
     Return(parser::Expression)
 }

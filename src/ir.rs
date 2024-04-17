@@ -1,6 +1,6 @@
 //intermidiate representation
 
-use crate::parser::{self, Expression, VariableName};
+use crate::parser::{self, Assignment, Expression, VariableName};
 use crate::ssa;
 pub type Label = String;
 pub type Function = String;
@@ -37,7 +37,7 @@ pub enum Data {
     Number(i64),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum IrInstruction {
     Jump(Label),
     JumpFalse(Data, Label),
@@ -183,7 +183,7 @@ fn transform_assignment(assignment: &ssa::SsaAssignment, name_factory: &mut Name
     instructions
 }
 
-fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNodes, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
+fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNodes, loop_phi_nodes: &ssa::LoopPhiNodes, name_factory: &mut NameFactory) -> Vec<IrInstruction> {
     let mut instructions: Vec<IrInstruction> = vec![];
     let start_loop_label = &name_factory.get_label();
     let end_loop_label = &name_factory.get_label();
@@ -191,15 +191,26 @@ fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNode
     let inner_loop_label = &name_factory.get_label();
     let total_end_label = &name_factory.get_label();
 
+
+
     let (result, mut condition_ir) = transform_expression(&while_loop.condition, name_factory);
-    instructions.append(&mut condition_ir);
+    instructions.append(&mut condition_ir.clone());
     instructions.push(IrInstruction::JumpFalse(result.clone(), init_false_loop_label.to_owned()));
+    //init inner block vars
+    for phi in phi_nodes {
+        instructions.push(IrInstruction::Assignment(phi.inner_option.to_owned(), Data::Variable(phi.outer_option.to_owned())));
+    }
     instructions.push(IrInstruction::Jump(inner_loop_label.to_owned()));
     instructions.push(IrInstruction::Label(start_loop_label.to_owned()));
     instructions.append(&mut condition_ir);
     instructions.push(IrInstruction::JumpFalse(result, end_loop_label.to_owned()));
     instructions.push(IrInstruction::Label(inner_loop_label.to_owned()));
     instructions.append(&mut transform_block(&while_loop.block, name_factory));
+    //condition phi nodes
+    for loop_phi in loop_phi_nodes {
+        instructions.push(IrInstruction::Assignment(loop_phi.condition_var.to_owned(), Data::Variable(loop_phi.inner_var.to_owned())));
+        instructions.push(IrInstruction::Assignment(loop_phi.condition_var.to_owned(), Data::Variable(loop_phi.condition_var.to_owned())));
+    }
     instructions.push(IrInstruction::Jump(start_loop_label.to_owned()));
     instructions.push(IrInstruction::Label(init_false_loop_label.to_owned()));
     //outer nodes
@@ -213,6 +224,7 @@ fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNode
         instructions.push(IrInstruction::Assignment(phi.result_var.to_owned(), Data::Variable(phi.inner_option.to_owned())));
     }
     instructions.push(IrInstruction::Label(total_end_label.to_owned()));
+
     instructions
 }
 
@@ -244,7 +256,7 @@ fn transform_statement(statement: &ssa::SsaStatement, name_factory: &mut NameFac
         ssa::SsaStatement::Assignment(a) => transform_assignment(a, name_factory),
         ssa::SsaStatement::IfStatement(s, phi) => transform_if_statement(s, phi, name_factory),
         ssa::SsaStatement::FunctionCall(f) => transform_function_call(f, name_factory),
-        ssa::SsaStatement::WhileLoop(l, phi) => transform_while_loop(l, phi, name_factory),
+        ssa::SsaStatement::WhileLoop(l, phi, loop_phi) => transform_while_loop(l, phi, loop_phi, name_factory),
         ssa::SsaStatement::Return(e) =>transform_return(e, name_factory)
     }
 }

@@ -635,15 +635,15 @@ pub fn print_decoded_bytes(bytes: &Vec<u8>, rip: u64) {
         output.clear();
         formatter.format(&instruction, &mut output);
 
-        print!("{:016X} ", instruction.ip());
+        //print!("{:016X} ", instruction.ip());
         let start_index = (instruction.ip() - rip) as usize;
         let instr_bytes = &bytes[start_index..start_index + instruction.len()];
         for b in instr_bytes.iter() {
-            print!("{:02X}", b);
+            //print!("{:02X}", b);
         }
         if instr_bytes.len() < 10 {
             for _ in 0..10 - instr_bytes.len() {
-                print!("  ");
+                //print!("  ");
             }
         }
         println!(" {}", output);

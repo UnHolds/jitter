@@ -14,12 +14,16 @@ fn main() {
 
     let code = "
     fun main() {
-        return test(4) + test(5);
+        b = 0;
+        c = 0;
+        while (b < 8) {
+            b = b + 1;
+            c = c + 5;
+        }
+        return c;
     }
     fun test(a) {
-        if (a > 4){
-            return 5 + a;
-        }
+
     }
     ";
     let program = parser::parse(&mut lexer::lex(code)).unwrap();
