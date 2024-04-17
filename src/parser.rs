@@ -72,14 +72,14 @@ pub struct WhileLoop {
     pub block: Block
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionCall {
     pub name: FunctionIdentifier,
     pub arguments: Arguments
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Number(i64),
     Variable(VariableName),

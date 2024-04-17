@@ -6,6 +6,7 @@ mod var_allocator;
 use crate::memory::{self, Executable, Memory, Writeable};
 use crate::ir::{self, Data, IrInstruction};
 use crate::parser;
+use crate::jit;
 
 use self::lifetime::LifetimeChecker;
 use self::var_allocator::VariableLocation;
@@ -358,6 +359,129 @@ fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) ->
     Ok(())
 }
 
+
+fn set_arguments(args: &Vec<Data>, line: u64, generator: &mut CodeGenerator) -> Result<u64, IcedError> {
+    #[cfg(target_os = "windows")]
+    let arg_regs = [
+        rcx,
+        rdx,
+        r8,
+        r9
+    ];
+
+    #[cfg(target_os = "linux")]
+    let arg_regs = [
+        rdi,
+        rsi,
+        rdx,
+        rcx,
+        r8,
+        r9
+    ];
+
+    let mut pushed_args = 0;
+
+    for (i, arg) in args.iter().enumerate() {
+        if i < arg_regs.len() {
+            match arg {
+                Data::Number(n) => generator.code_assembler.mov(arg_regs[i], n.to_owned())?,
+                Data::Variable(v) => {
+                    match generator.variable_allocator.get(v, line, &mut generator.lifetime_checker){
+                        VariableLocation::Register(r) => generator.code_assembler.mov(arg_regs[i], r)?,
+                        VariableLocation::Stack(s) => generator.code_assembler.mov(arg_regs[i], rbp + s)?
+                    };
+                }
+            };
+        }else{
+            pushed_args += 1;
+            match arg {
+                Data::Number(n) =>{
+                    generator.code_assembler.mov(rax, n.to_owned())?;
+                    generator.code_assembler.push(rax)?
+                },
+                Data::Variable(v) => {
+                    match generator.variable_allocator.get(v, 0, &mut generator.lifetime_checker){
+                        VariableLocation::Register(r) => generator.code_assembler.push(r)?,
+                        VariableLocation::Stack(s) => {
+                            generator.code_assembler.mov(rax, rbp + s)?;
+                            generator.code_assembler.push(rax)?;
+                        }
+                    };
+                }
+            };
+        }
+    }
+    Ok(pushed_args)
+}
+
+
+fn unset_arguments(pushed_args: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
+    let mut i = 0;
+    while i < pushed_args{
+        generator.code_assembler.pop(rbx)?;
+        i += 1;
+    }
+    Ok(())
+}
+
+fn save_registers(generator: &mut CodeGenerator) -> Result<(), IcedError>{
+    generator.code_assembler.push(rcx)?;
+    generator.code_assembler.push(rdx)?;
+    generator.code_assembler.push(r8)?;
+    generator.code_assembler.push(r9)?;
+    generator.code_assembler.push(r10)?;
+    generator.code_assembler.push(r11)?;
+    Ok(())
+}
+
+fn restore_registers(generator: &mut CodeGenerator) -> Result<(), IcedError>{
+    generator.code_assembler.pop(r11)?;
+    generator.code_assembler.pop(r10)?;
+    generator.code_assembler.pop(r9)?;
+    generator.code_assembler.pop(r8)?;
+    generator.code_assembler.pop(rdx)?;
+    generator.code_assembler.pop(rcx)?;
+    Ok(())
+}
+
+
+fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>, function_tracker: &mut jit::FunctionTracker, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
+
+    let mut jit_args = vec![];
+    jit_args.push(Data::Number(function_tracker as *const _ as i64));
+    jit_args.push(Data::Number(function_tracker.get_id(fun_name)));
+
+    save_registers(generator)?;
+    let pushed_args = set_arguments(&jit_args, line, generator)?;
+    generator.code_assembler.mov(rbx, rdi)?;
+    generator.code_assembler.push(rdi)?;
+    generator.code_assembler.mov(rdi, rbx)?;
+    generator.code_assembler.call(jit::jit_callback as u64)?;
+    generator.code_assembler.pop(rdi)?;
+    unset_arguments(pushed_args, generator)?;
+    restore_registers(generator)?;
+
+
+    save_registers(generator)?;
+    let pushed_args = set_arguments(args, line, generator)?;
+    generator.code_assembler.mov(rbx, rdi)?;
+    generator.code_assembler.push(rdi)?;
+    generator.code_assembler.mov(rdi, rbx)?;
+    generator.code_assembler.call(rax)?;
+    generator.code_assembler.pop(rdi)?;
+    unset_arguments(pushed_args,  generator)?;
+    restore_registers(generator)?;
+
+    let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
+    match res_loc {
+        VariableLocation::Register(r) => generator.code_assembler.mov(r, rax)?,
+        VariableLocation::Stack(s) => generator.code_assembler.mov(rbp + s, rax)?
+    }
+
+    Ok(())
+}
+
+
 pub struct CodeGenerator {
     lifetime_checker: LifetimeChecker,
     variable_allocator: var_allocator::VariableAllocator,
@@ -365,17 +489,11 @@ pub struct CodeGenerator {
     labels: HashMap<String, CodeLabel>
 }
 
-pub struct FunctionTracker{
-    functions: HashMap<String, CodeLabel>
-}
-impl FunctionTracker {
-    pub fn new() -> Self {
-        FunctionTracker {functions: HashMap::new()}
-    }
-}
+
+
 
 #[allow(dead_code)]
-pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters: &parser::Parameters, function_tracker: &mut FunctionTracker) -> Result<Vec<Instruction>, IcedError> {
+pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Parameters, function_tracker: &mut jit::FunctionTracker) -> Result<Vec<Instruction>, IcedError> {
     let mut _lifetime = lifetime::get_checker(instructions, parameters);
     let mut generator = CodeGenerator {
         code_assembler: CodeAssembler::new(64)?,
@@ -383,10 +501,6 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters
         variable_allocator: var_allocator::VariableAllocator::new(parameters, &mut _lifetime),
         lifetime_checker: _lifetime
     };
-
-    let mut label = generator.code_assembler.create_label();
-    generator.code_assembler.set_label(&mut label)?;
-    function_tracker.functions.insert(name.to_owned(), label);
 
     //save callee registers
     generator.code_assembler.push(rbp)?;
@@ -401,7 +515,6 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters
     generator.code_assembler.push(r14)?;
     generator.code_assembler.push(r15)?;
 
-
     for (line, inst) in instructions.iter().enumerate() {
 
         match inst {
@@ -415,7 +528,7 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, name: &String, parameters
                 generate_label(label, &mut generator)?;
             }
             ir::IrInstruction::FunctionCall(res_var, fun_name, args) => {
-                panic!("Function call not implemented yet (ASM)")
+                generate_function_call(res_var, fun_name, args, function_tracker, line as u64, &mut generator)?;
             }
             ir::IrInstruction::Addition(res_var, data1, data2) => {
                 generate_addition(res_var, data1, data2, line as u64, &mut generator)?;

@@ -173,44 +173,45 @@ pub struct SsaProgram {
 pub type SsaBlock = Vec<SsaStatement>;
 pub type PhiNodes = Vec<PhiNode>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PhiNode {
     pub result_var: VariableName,
     pub inner_option: VariableName,
     pub outer_option: VariableName
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct SsaFunction {
     pub name: parser::FunctionIdentifier,
     pub parameters: parser::Parameters,
     pub block: SsaBlock
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SsaAssignment {
     pub variable_name: VariableName,
     pub expression: parser::Expression
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SsaIfStatement {
     pub condition: parser::Expression,
     pub block: SsaBlock
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SsaWhileLoop {
     pub condition: parser::Expression,
     pub block: SsaBlock
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SsaFunctionCall {
     pub name: parser::FunctionIdentifier,
     pub arguments: parser::Arguments
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SsaStatement {
     Assignment(SsaAssignment),
     IfStatement(SsaIfStatement, PhiNodes),

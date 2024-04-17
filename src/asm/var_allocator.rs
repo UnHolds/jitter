@@ -57,7 +57,7 @@ pub struct VariableAllocator {
 
 impl VariableAllocator {
     pub fn new(parameters: &parser::Parameters, lifetime_checker: &mut lifetime::LifetimeChecker) -> Self {
-
+        #[cfg(target_os = "linux")]
         let mut free_registers = [
             r15,
             r14,
@@ -74,12 +74,33 @@ impl VariableAllocator {
             rdi
         ].to_vec();
 
+        #[cfg(target_os = "windows")]
+        let mut free_registers = [
+            r15,
+            r14,
+            r13,
+            r12,
+            r11,
+            r10,
+            rbx,
+            rsi,
+            rdi,
+            r9,
+            r8,
+            rdx,
+            rcx,
+        ].to_vec();
+
         let mut variables = vec![];
         let mut offset = 16;
+        #[cfg(target_os = "linux")]
+        let number_of_register_arguments = 6;
+        #[cfg(target_os = "windows")]
+        let number_of_register_arguments = 4;
         //allocate the function parameters
         for (i, parameter) in parameters.iter().enumerate() {
             let lifetime_end = lifetime_checker.get_end_lifetime(parameter) as u64;
-            if i < 6 {
+            if i < number_of_register_arguments {
                 //allocate parameter register
                 variables.push(AllocatedVariable { location: VariableLocation::Register(free_registers.pop().unwrap()), lifetime_end: lifetime_end, name: parameter.to_owned()});
             }else{
@@ -100,6 +121,10 @@ impl VariableAllocator {
         for var in &self.variables {
             println!("Name: {} - Location: {} - Lifetime end at line {}", var.name, var.location, var.lifetime_end);
         }
+    }
+
+    pub fn is_allocated(&mut self, reg: AsmRegister64) -> bool{
+        self.free_registers.contains(&reg)
     }
 
     fn check(&mut self, line: u64) {
@@ -125,6 +150,7 @@ impl VariableAllocator {
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
             location
         }else{
+            println!("STACK ALLOC NOT GUD");
             let location = VariableLocation::Stack(self.next_stack_variable_offset);
             self.next_stack_variable_offset = self.next_stack_variable_offset - 8;
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
