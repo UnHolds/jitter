@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, NasmFormatter, Register};
+use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, NasmFormatter};
 use iced_x86::code_asm::*;
 mod lifetime;
 mod var_allocator;
-use crate::memory::{self, Executable, Memory, Writeable};
-use crate::ir::{self, Data, IrInstruction};
+use crate::ir::{self, Data};
 use crate::parser;
 use crate::jit;
 
@@ -424,23 +423,43 @@ fn unset_arguments(pushed_args: u64, generator: &mut CodeGenerator) -> Result<()
     Ok(())
 }
 
-fn save_registers(generator: &mut CodeGenerator) -> Result<(), IcedError>{
-    generator.code_assembler.push(rcx)?;
-    generator.code_assembler.push(rdx)?;
-    generator.code_assembler.push(r8)?;
-    generator.code_assembler.push(r9)?;
-    generator.code_assembler.push(r10)?;
-    generator.code_assembler.push(r11)?;
-    Ok(())
+fn save_registers(mut number_of_args: u64, generator: &mut CodeGenerator) -> Result<Vec<AsmRegister64>, IcedError>{
+    let mut saved_vec = vec![];
+
+    #[cfg(target_os = "windows")]
+    let registers = [rcx, rdx, r8, r9, r10, r11];
+
+    #[cfg(target_os = "windows")]
+    let max_reg_args = 4;
+
+    #[cfg(target_os = "linux")]
+    let registers = [rcx, rdx, rsi, rsp, r8, r9, r10, r11];
+
+    #[cfg(target_os = "linux")]
+    let max_reg_args = 6;
+
+    //cap number of args
+    if number_of_args > max_reg_args{
+        number_of_args = max_reg_args;
+    }
+
+    let mut args = 0;
+    for reg in registers{
+        if generator.variable_allocator.is_allocated(reg) || args < number_of_args {
+            generator.code_assembler.mov(rbx, reg)?;
+            generator.code_assembler.push(reg)?;
+            generator.code_assembler.mov(reg, rbx)?;
+            saved_vec.push(reg);
+        }
+        args += 1;
+    }
+    Ok(saved_vec)
 }
 
-fn restore_registers(generator: &mut CodeGenerator) -> Result<(), IcedError>{
-    generator.code_assembler.pop(r11)?;
-    generator.code_assembler.pop(r10)?;
-    generator.code_assembler.pop(r9)?;
-    generator.code_assembler.pop(r8)?;
-    generator.code_assembler.pop(rdx)?;
-    generator.code_assembler.pop(rcx)?;
+fn restore_registers(saved_regs: Vec<AsmRegister64>, generator: &mut CodeGenerator) -> Result<(), IcedError>{
+    for reg in saved_regs.iter().copied().rev() {
+        generator.code_assembler.pop(reg)?;
+    }
     Ok(())
 }
 
@@ -451,7 +470,7 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
     jit_args.push(Data::Number(function_tracker as *const _ as i64));
     jit_args.push(Data::Number(function_tracker.get_id(fun_name)));
 
-    save_registers(generator)?;
+    let saved_regs = save_registers(jit_args.len() as u64, generator)?;
     let pushed_args = set_arguments(&jit_args, line, generator)?;
     generator.code_assembler.mov(rbx, rdi)?;
     generator.code_assembler.push(rdi)?;
@@ -459,10 +478,10 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
     generator.code_assembler.call(jit::jit_callback as u64)?;
     generator.code_assembler.pop(rdi)?;
     unset_arguments(pushed_args, generator)?;
-    restore_registers(generator)?;
+    restore_registers(saved_regs, generator)?;
 
 
-    save_registers(generator)?;
+    let saved_regs = save_registers(args.len() as u64, generator)?;
     let pushed_args = set_arguments(args, line, generator)?;
     generator.code_assembler.mov(rbx, rdi)?;
     generator.code_assembler.push(rdi)?;
@@ -470,7 +489,7 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
     generator.code_assembler.call(rax)?;
     generator.code_assembler.pop(rdi)?;
     unset_arguments(pushed_args,  generator)?;
-    restore_registers(generator)?;
+    restore_registers(saved_regs, generator)?;
 
     let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
     match res_loc {
@@ -624,37 +643,4 @@ pub fn assemble(instructions: &Vec<Instruction>, ip: u64) -> Result<Vec<u8>, Ice
         a.add_instruction(inst.to_owned())?;
     }
     Ok(a.assemble(ip)?)
-}
-
-#[allow(dead_code)]
-pub fn test() -> Result<(), IcedError>  {
-    let mut a = CodeAssembler::new(64)?;
-    a.mov(rax, 10 as u64)?;
-    a.push(rax)?;
-    a.mov(rbx, rbp - 8)?;
-    a.mov(rax, 5 as u64)?;
-    let bytes = a.assemble(0x1234_5678)?;
-    print_decoded_bytes(&bytes, 0x1234_5678);
-
-    // Encode all added instructions.
-    // Use `assemble_options()` if you must get the address of a label
-    /*
-    let bytes = a.assemble(0x1234_5678)?;
-    let mut mem = memory::ExecuteableMemory::new(bytes.len());
-    let addr = mem.address() as u64;
-    println!("addr: {:?}", addr);
-    let bytes = a.assemble(addr)?;
-    let inst = a.take_instructions();
-    println!("Bytes: {:?}", bytes);
-    mem.write(&bytes);
-    println!("ok!");
-    let f = mem.as_function();
-    f();
-    println!("ok2");
-    */
-
-
-
-
-    Ok(())
 }

@@ -83,8 +83,6 @@ impl VariableAllocator {
             r11,
             r10,
             rbx,
-            rsi,
-            rdi,
             r9,
             r8,
             rdx,
@@ -163,9 +161,5 @@ impl VariableAllocator {
             None => self.allcoate(name, line, lifetime_checker),
             Some(v) => v.location
         }
-    }
-
-    pub fn get_number_of_stack_variable(&mut self) -> i64 {
-        (self.next_stack_variable_offset - 8) / 8
     }
 }
