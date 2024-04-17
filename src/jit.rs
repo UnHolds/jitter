@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::mem;
 use bimap::BiMap;
+use winapi::ctypes::c_void;
 use crate::memory::Executable;
 use crate::memory::ExecuteableMemory;
 use crate::memory::Writeable;
@@ -15,6 +17,53 @@ pub struct FunctionTracker{
     id_memory_mapping: HashMap<FunctionId, ExecuteableMemory>,
     program: ssa::SsaProgram,
 }
+
+pub struct MainFunction {
+    function: fn() -> i64,
+    num_args: u64,
+}
+
+
+impl std::fmt::Display for JitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidNumberOfArguments(expected, found) =>
+                write!(f, "Invalid number of arguments for main function! Expected {:?}. Found {:?}.", expected, found),
+            Self::TooManyArguments =>
+                write!(f, "The execute function can't handle so many arguments (JIT limitation)"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum JitError {
+    InvalidNumberOfArguments(u64, u64),
+    TooManyArguments
+}
+
+impl MainFunction {
+    pub fn execute(&mut self, args: Vec<i64>) -> Result<i64, JitError> {
+        unsafe {
+
+            if args.len() as u64 != self.num_args {
+                return Err(JitError::InvalidNumberOfArguments(self.num_args, args.len() as u64))
+            }
+
+            let res = match args.len() {
+                0 => (self.function)(),
+                1 => mem::transmute::<fn() -> i64, fn(i64) -> i64>(self.function)(args[0]),
+                2 => mem::transmute::<fn() -> i64, fn(i64, i64) -> i64>(self.function)(args[0], args[1]),
+                3 => mem::transmute::<fn() -> i64, fn(i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2]),
+                4 => mem::transmute::<fn() -> i64, fn(i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3]),
+                5 => mem::transmute::<fn() -> i64, fn(i64, i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3], args[4]),
+                _ => return Err(JitError::TooManyArguments)
+            };
+            Ok(res)
+        }
+    }
+}
+
+
 impl FunctionTracker {
     pub fn new(program: ssa::SsaProgram) -> Self {
         let mut name_id_mapping = BiMap::new();
@@ -29,9 +78,10 @@ impl FunctionTracker {
         }
     }
 
-    pub fn get_main_function(&mut self) -> fn() -> i64 {
+    pub fn get_main_function(&mut self) -> MainFunction {
         let id = self.get_id(&"main".to_owned());
-        self.complile_function(id)
+        let fun = self.program.functions.iter().find(|f| f.name == "main".to_owned()).unwrap().clone();
+        MainFunction{function: self.complile_function(id), num_args: fun.parameters.len() as u64}
     }
 
 
