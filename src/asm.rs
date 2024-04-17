@@ -608,6 +608,7 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
             ir::IrInstruction::Return(data) => {
                 generate_return(data, line as u64, &mut generator)?;
             }
+            ir::IrInstruction::KeepAlive(_) => ()
         }
     }
 

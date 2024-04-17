@@ -57,7 +57,8 @@ pub enum IrInstruction {
     LogicAnd(ResultVariable, Data, Data),
     LogicOr(ResultVariable, Data, Data),
     Assignment(ResultVariable, Data),
-    Return(Data)
+    Return(Data),
+    KeepAlive(VariableName)
 }
 
 fn handle_binary_expression(b: &Box<(Expression, Expression)> , name_factory: &mut NameFactory) -> (Data, Data, Vec<IrInstruction>) {
@@ -209,7 +210,7 @@ fn transform_while_loop(while_loop: &ssa::SsaWhileLoop, phi_nodes: &ssa::PhiNode
     //condition phi nodes
     for loop_phi in loop_phi_nodes {
         instructions.push(IrInstruction::Assignment(loop_phi.condition_var.to_owned(), Data::Variable(loop_phi.inner_var.to_owned())));
-        instructions.push(IrInstruction::Assignment(loop_phi.condition_var.to_owned(), Data::Variable(loop_phi.condition_var.to_owned())));
+        instructions.push(IrInstruction::KeepAlive(loop_phi.condition_var.to_owned()));
     }
     instructions.push(IrInstruction::Jump(start_loop_label.to_owned()));
     instructions.push(IrInstruction::Label(init_false_loop_label.to_owned()));

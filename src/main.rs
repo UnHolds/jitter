@@ -1,7 +1,3 @@
-use memory::{Executable, Writeable};
-
-use crate::memory::Memory;
-
 mod lexer;
 mod parser;
 mod semantic;
