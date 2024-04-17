@@ -1,5 +1,5 @@
 use crate::lexer::{self, Token};
-
+use crate::predefined_functions;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
@@ -109,7 +109,13 @@ pub enum Statement {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Function {
+pub enum Function {
+    Internal(InternalFunction),
+    External(predefined_functions::ExternalFunction)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InternalFunction {
     pub name: FunctionIdentifier,
     pub parameters: Parameters,
     pub block: Block
@@ -433,7 +439,7 @@ fn parse_function(lex: &mut std::iter::Peekable<logos::Lexer<'_, lexer::Token>>)
     check_token(get_token(lex.next())?, lexer::Token::OpeningCurlyBracket)?;
     let block = parse_block(lex)?;
     check_token(get_token(lex.next())?, lexer::Token::ClosingCurlyBracket)?;
-    Ok(Function { name, parameters, block})
+    Ok(Function::Internal(InternalFunction { name, parameters, block}))
 }
 
 
@@ -530,14 +536,14 @@ mod tests {
     fn parser_function_with_args() {
         let code = "fun test(a, b){}";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(parse_function(&mut lex), Ok(Function { name: "test".to_owned(), parameters: vec!["a".to_owned(), "b".to_owned()], block: vec![] }))
+        assert_eq!(parse_function(&mut lex), Ok(Function::Internal(InternalFunction{ name: "test".to_owned(), parameters: vec!["a".to_owned(), "b".to_owned()], block: vec![] })))
     }
 
     #[test]
     fn parser_function() {
         let code = "fun test(){}";
         let mut lex = lexer::Token::lexer(code).peekable();
-        assert_eq!(parse_function(&mut lex), Ok(Function { name: "test".to_owned(), parameters: vec![], block: vec![] }))
+        assert_eq!(parse_function(&mut lex), Ok(Function::Internal(InternalFunction { name: "test".to_owned(), parameters: vec![], block: vec![] })))
     }
 
     #[test]

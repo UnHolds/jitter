@@ -459,10 +459,9 @@ fn save_registers(mut number_of_args: u64, generator: &mut CodeGenerator) -> Res
 
     let mut args = 0;
     for reg in registers{
-        if generator.variable_allocator.is_allocated(reg) || args < number_of_args {
-            generator.code_assembler.mov(rbx, reg)?;
+        //TODO fix variable save
+        if generator.variable_allocator.is_allocated(reg) || args < number_of_args || true {
             generator.code_assembler.push(reg)?;
-            generator.code_assembler.mov(reg, rbx)?;
             saved_vec.push(reg);
         }
         args += 1;
@@ -481,8 +480,9 @@ fn restore_registers(saved_regs: Vec<AsmRegister64>, generator: &mut CodeGenerat
 fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>, function_tracker: &mut jit::FunctionTracker, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
 
     let mut jit_args = vec![];
+    let fun_id = function_tracker.get_id(fun_name);
     jit_args.push(Data::Number(function_tracker as *const _ as i64));
-    jit_args.push(Data::Number(function_tracker.get_id(fun_name)));
+    jit_args.push(Data::Number(fun_id.to_owned()));
 
     let saved_regs = save_registers(jit_args.len() as u64, generator)?;
     let pushed_args = set_arguments(&jit_args, line, generator)?;
@@ -636,15 +636,15 @@ pub fn print_decoded_bytes(bytes: &Vec<u8>, rip: u64) {
         output.clear();
         formatter.format(&instruction, &mut output);
 
-        //print!("{:016X} ", instruction.ip());
+        print!("{:016X} ", instruction.ip());
         let start_index = (instruction.ip() - rip) as usize;
         let instr_bytes = &bytes[start_index..start_index + instruction.len()];
         for b in instr_bytes.iter() {
-            //print!("{:02X}", b);
+            print!("{:02X}", b);
         }
         if instr_bytes.len() < 10 {
             for _ in 0..10 - instr_bytes.len() {
-                //print!("  ");
+                print!("  ");
             }
         }
         println!(" {}", output);

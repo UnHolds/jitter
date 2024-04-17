@@ -1,6 +1,6 @@
 //intermidiate representation
 
-use crate::parser::{self, Assignment, Expression, VariableName};
+use crate::parser::{self, Expression, VariableName};
 use crate::ssa;
 pub type Label = String;
 pub type Function = String;

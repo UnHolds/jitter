@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use itertools::{self, Itertools};
-use crate::parser::{self, Assignment, VariableName};
+use crate::{parser::{self, VariableName}, predefined_functions::ExternalFunction};
 
 struct VariableTracker {
     vars: HashMap<String, u64>
@@ -116,7 +116,7 @@ fn get_ref_vars_expression(expression: &parser::Expression) -> Vec<String>{
     let mut ref_vars = vec![];
 
     match expression {
-        parser::Expression::Number(n) => (),
+        parser::Expression::Number(_) => (),
         parser::Expression::Variable(v) => {
             ref_vars.push(v.to_owned());
         },
@@ -241,7 +241,8 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
 
 
 pub struct SsaProgram {
-    pub functions: Vec<SsaFunction>
+    pub functions: Vec<SsaFunction>,
+    pub external_functions: Vec<ExternalFunction>
 }
 
 
@@ -305,12 +306,18 @@ pub enum SsaStatement {
 
 pub fn convert(program: &parser::Program) -> SsaProgram {
     let mut new_function = vec![];
+    let mut ext_function: Vec<ExternalFunction> = vec![];
     let mut var_tracker = VariableTracker::new();
     for function in &program.functions {
-        let new_parameters = function.parameters.iter().map(|p| var_tracker.get_new(p)).collect();
-        let new_block = convert_block(&function.block, &mut var_tracker);
-        new_function.push(SsaFunction{name: function.name.to_owned(), block: new_block, parameters: new_parameters});
+        match function{
+            parser::Function::Internal(f) => {
+                let new_parameters = f.parameters.iter().map(|p| var_tracker.get_new(p)).collect();
+                let new_block = convert_block(&f.block, &mut var_tracker);
+                new_function.push(SsaFunction{name: f.name.to_owned(), block: new_block, parameters: new_parameters});
+            }
+            parser::Function::External(f) => ext_function.push(f.clone())
+        }
     }
 
-    SsaProgram { functions: new_function }
+    SsaProgram { functions: new_function, external_functions: ext_function }
 }

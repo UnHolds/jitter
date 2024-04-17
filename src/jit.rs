@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::mem;
 use bimap::BiMap;
-use winapi::ctypes::c_void;
 use crate::memory::Executable;
 use crate::memory::ExecuteableMemory;
 use crate::memory::Writeable;
@@ -14,6 +13,7 @@ pub type FunctionId = i64;
 
 pub struct FunctionTracker{
     name_id_mapping: BiMap<String, FunctionId>,
+    id_external_fun_mapping: HashMap<FunctionId, FunctionAddress>,
     id_memory_mapping: HashMap<FunctionId, ExecuteableMemory>,
     program: ssa::SsaProgram,
 }
@@ -69,10 +69,20 @@ impl FunctionTracker {
         let mut name_id_mapping = BiMap::new();
         for (idx, name) in program.functions.iter().map(|f| f.name.to_owned() ).enumerate() {
             name_id_mapping.insert(name, idx as i64);
+
         }
+
+        let mut id_external_fun_mapping = HashMap::new();
+        for (idx, fun) in program.external_functions.iter().enumerate() {
+            name_id_mapping.insert(fun.name.to_owned(), -(idx as i64) - 1);
+            id_external_fun_mapping.insert(-(idx as i64) - 1, fun.address.to_owned());
+        }
+
+
 
         FunctionTracker {
             name_id_mapping: name_id_mapping,
+            id_external_fun_mapping: id_external_fun_mapping,
             id_memory_mapping: HashMap::new(),
             program: program
         }
@@ -88,7 +98,7 @@ impl FunctionTracker {
     pub fn get_id(&mut self, name: &String) -> FunctionId{
         match self.name_id_mapping.get_by_left(name) {
             None =>{
-                panic!("All the ids should have been defined!")
+                panic!("All the ids should have been defined, but couldn't find id for: {}", name)
             },
             Some(counter) => counter.to_owned()
         }
@@ -111,12 +121,20 @@ impl FunctionTracker {
     }
 
     pub fn get_function_address(&mut self, id: FunctionId) -> FunctionAddress {
-        match self.id_memory_mapping.get_mut(&id) {
-            None => self.complile_function(id) as u64,
-            Some(mem) => {
-                mem.as_function() as u64
+        if id >= 0 {
+            match self.id_memory_mapping.get_mut(&id) {
+                None => self.complile_function(id) as u64,
+                Some(mem) => {
+                    mem.as_function() as u64
+                }
+            }
+        }else{
+            match self.id_external_fun_mapping.get_mut(&id) {
+                None => panic!("The function with {} does not exit", id),
+                Some(v) => return v.to_owned()
             }
         }
+
     }
 
 

@@ -6,14 +6,17 @@ mod memory;
 mod ir;
 mod ssa;
 mod jit;
+mod predefined_functions;
 fn main() {
 
     let code = "
     fun main(a, b) {
+        cool();
         return a + b;
     }
     ";
-    let program = parser::parse(&mut lexer::lex(code)).unwrap();
+    let mut program = parser::parse(&mut lexer::lex(code)).unwrap();
+    predefined_functions::add(&mut program);
     semantic::check(&program).unwrap();
     let program_ssa = ssa::convert(&program);
     let mut function_tracker = jit::FunctionTracker::new(program_ssa);

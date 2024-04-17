@@ -28,7 +28,7 @@ impl std::fmt::Display for SemanticError {
     }
 }
 
-fn check_duplicate_parameters(function: &parser::Function) -> SemanticResult {
+fn check_duplicate_parameters(function: &parser::InternalFunction) -> SemanticResult {
     let mut uniq = std::collections::HashSet::new();
     if (&function.parameters).into_iter().all(move |x| uniq.insert(x)) {
         Ok(())
@@ -40,8 +40,17 @@ fn check_duplicate_parameters(function: &parser::Function) -> SemanticResult {
 fn check_duplicate_functions(program: &parser::Program) -> SemanticResult {
     let mut uniq = std::collections::HashSet::new();
     for function in &program.functions {
-        if uniq.insert(function.name.to_owned()) == false {
-            return Err(SemanticError::DuplicateFunction(function.name.to_owned()))
+        match function {
+            parser::Function::Internal(f) => {
+                if uniq.insert(f.name.to_owned()) == false {
+                    return Err(SemanticError::DuplicateFunction(f.name.to_owned()))
+                }
+            }
+            parser::Function::External(f) => {
+                if uniq.insert(f.name.to_owned()) == false {
+                    return Err(SemanticError::DuplicateFunction(f.name.to_owned()))
+                }
+            }
         }
     }
     Ok(())
@@ -300,12 +309,22 @@ fn check_function(declared_function_names_and_arg_count: &Vec<(String, u64)>, fu
 
 pub fn check(program: &parser::Program) -> SemanticResult {
     check_duplicate_functions(program)?;
-    let declared_function_names_and_arg_count: Vec<(String, u64)> = program.functions.iter().map(|f| (f.name.to_owned(), f.parameters.len() as u64)).collect();
+    let declared_function_names_and_arg_count: Vec<(String, u64)> = program.functions.iter().map(|fun|
+        match fun {
+            parser::Function::Internal(f) => (f.name.to_owned(), f.parameters.len() as u64),
+            parser::Function::External(f) => (f.name.to_owned(), f.parameters.len() as u64)
+        }
+    ).collect();
     for function in &program.functions {
-        check_duplicate_parameters(function)?;
-        let mut vars = vec![function.parameters.clone()];
-        check_variable_use_before_init(&mut vars, &function.block)?;
-        check_if_function_exist_on_call(&declared_function_names_and_arg_count, &function.block)?;
+        match function {
+            parser::Function::Internal(f) => {
+                check_duplicate_parameters(f)?;
+                let mut vars = vec![f.parameters.clone()];
+                check_variable_use_before_init(&mut vars, &f.block)?;
+                check_if_function_exist_on_call(&declared_function_names_and_arg_count, &f.block)?;
+            }
+            parser::Function::External(f) => ()
+        }
     }
     Ok(())
 }
