@@ -1,9 +1,10 @@
-use crate::parser::{self, Expression, Statement};
+use crate::parser::{self, Expression, FunctionCall, Statement};
 
 #[derive(Debug, PartialEq)]
 pub enum SemanticError {
     DuplicateParameter(String),
     DuplicateFunction(String),
+    FunctionArgumentCountMissmatch(String),
     VariableUsedBeforeInit,
     FunctionDoesNotExist(String),
 }
@@ -21,6 +22,8 @@ impl std::fmt::Display for SemanticError {
             write!(f, "variable used before init"),
             Self::FunctionDoesNotExist(fun) =>
             write!(f, "function does not exist: {}", fun),
+            Self::FunctionArgumentCountMissmatch(fun) =>
+            write!(f, "function call has invalid number of arguments: {}", fun),
         }
     }
 }
@@ -173,125 +176,136 @@ fn check_variable_use_before_init(known_vars: &mut Vec<Vec<String>>, block: &par
     Ok(())
 }
 
-fn check_if_function_exist_in_expression(delcared_functions: &Vec<String>, expression: &Expression) -> SemanticResult {
+fn check_if_function_exist_in_expression(declared_function_names_and_arg_count: &Vec<(String, u64)>, expression: &Expression) -> SemanticResult {
     match expression {
         Expression::Number(_) => Ok(()),
         Expression::Variable(_) => Ok(()),
         Expression::FunctionCall(fc) => {
-            if delcared_functions.contains(&fc.name) == false {
-                return Err(SemanticError::FunctionDoesNotExist(fc.name.to_owned()));
-            }
+            check_function(declared_function_names_and_arg_count, fc)?;
             for arg in &fc.arguments {
-                check_if_function_exist_in_expression(delcared_functions, arg)?;
+                check_if_function_exist_in_expression(declared_function_names_and_arg_count, arg)?;
             }
             Ok(())
         },
         Expression::Addition(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Subtraction(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Multiplication(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Division(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Modulo(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Greater(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::GreaterEquals(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Less(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::LessEquals(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::Equals(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::NotEquals(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::LogicAnd(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
         Expression::LogicOr(b) => {
-            check_if_function_exist_in_expression(delcared_functions, &b.0)?;
-            check_if_function_exist_in_expression(delcared_functions, &b.1)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.0)?;
+            check_if_function_exist_in_expression(declared_function_names_and_arg_count, &b.1)?;
             Ok(())
         },
     }
 }
 
 
-fn check_if_function_exist_on_call(delcared_functions: &Vec<String>, block: &parser::Block) -> SemanticResult {
+
+fn check_if_function_exist_on_call(declared_function_names_and_arg_count: &Vec<(String, u64)>, block: &parser::Block) -> SemanticResult {
     for statement in block {
         match statement {
             Statement::FunctionCall(f) => {
-                if delcared_functions.contains(&f.name) {
-                    return Ok(())
-                }else{
-                    return Err(SemanticError::FunctionDoesNotExist(f.name.to_owned()))
+                check_function(declared_function_names_and_arg_count, f)?;
+                for arg in &f.arguments {
+                    check_if_function_exist_in_expression(declared_function_names_and_arg_count, arg)?;
                 }
             },
             Statement::Assignment(a) => {
-                check_if_function_exist_in_expression(delcared_functions, &a.expression)?;
+                check_if_function_exist_in_expression(declared_function_names_and_arg_count, &a.expression)?;
             },
             Statement::IfStatement(s) => {
-                check_if_function_exist_in_expression(delcared_functions, &s.condition)?;
-                check_if_function_exist_on_call(delcared_functions, &s.block)?
+                check_if_function_exist_in_expression(declared_function_names_and_arg_count, &s.condition)?;
+                check_if_function_exist_on_call(declared_function_names_and_arg_count, &s.block)?
             },
             Statement::WhileLoop(l) => {
-                check_if_function_exist_in_expression(delcared_functions, &l.condition)?;
-                check_if_function_exist_on_call(delcared_functions, &l.block)?
+                check_if_function_exist_in_expression(declared_function_names_and_arg_count, &l.condition)?;
+                check_if_function_exist_on_call(declared_function_names_and_arg_count, &l.block)?
             },
             Statement::Return(e) => {
-                check_if_function_exist_in_expression(delcared_functions, e)?;
+                check_if_function_exist_in_expression(declared_function_names_and_arg_count, e)?;
             }
         }
     }
     Ok(())
 }
 
+fn check_function(declared_function_names_and_arg_count: &Vec<(String, u64)>, function_call: &FunctionCall) -> SemanticResult  {
+    let function = declared_function_names_and_arg_count.iter().find(|(n, _)| n.to_owned() == function_call.name);
+    match function {
+        None => Err(SemanticError::FunctionDoesNotExist(function_call.name.to_owned())),
+        Some((_, n_args)) => {
+            if n_args.to_owned() != function_call.arguments.len() as u64 {
+                return Err(SemanticError::FunctionArgumentCountMissmatch(function_call.name.to_owned()))
+            }
+            Ok(())
+        }
+    }
+}
+
 pub fn check(program: &parser::Program) -> SemanticResult {
     check_duplicate_functions(program)?;
-    let declared_function_names = program.functions.iter().map(|f| f.name.to_owned()).collect();
+    let declared_function_names_and_arg_count: Vec<(String, u64)> = program.functions.iter().map(|f| (f.name.to_owned(), f.parameters.len() as u64)).collect();
     for function in &program.functions {
         check_duplicate_parameters(function)?;
         let mut vars = vec![function.parameters.clone()];
         check_variable_use_before_init(&mut vars, &function.block)?;
-        check_if_function_exist_on_call(&declared_function_names, &function.block)?;
+        check_if_function_exist_on_call(&declared_function_names_and_arg_count, &function.block)?;
     }
     Ok(())
 }
@@ -359,6 +373,19 @@ mod tests {
         let mut lex = lexer::Token::lexer(code).peekable();
         let program = parser::parse(&mut lex).unwrap();
         assert!(check(&program).is_err_and(|e| e == SemanticError::DuplicateFunction("test1".to_owned())))
+    }
+
+    #[test]
+    fn check_wrong_number_arguments_function() {
+        let code = "
+        fun test1() {}
+        fun main(a) {
+            test1(a);
+        }
+        ";
+        let mut lex = lexer::Token::lexer(code).peekable();
+        let program = parser::parse(&mut lex).unwrap();
+        assert!(check(&program).is_err_and(|e| e == SemanticError::FunctionArgumentCountMissmatch("test1".to_owned())))
     }
 
 }
