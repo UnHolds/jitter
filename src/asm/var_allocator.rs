@@ -82,6 +82,8 @@ impl VariableAllocator {
             r12,
             r11,
             r10,
+            rsi,
+            rdi,
             rbx,
             r9,
             r8,
@@ -122,7 +124,7 @@ impl VariableAllocator {
     }
 
     pub fn is_allocated(&mut self, reg: AsmRegister64) -> bool{
-        self.free_registers.contains(&reg)
+        self.free_registers.contains(&reg) == false
     }
 
     fn check(&mut self, line: u64) {

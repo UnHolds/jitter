@@ -407,6 +407,7 @@ fn set_arguments(args: &Vec<Data>, line: u64, generator: &mut CodeGenerator) -> 
             };
         }else{
             pushed_args += 1;
+            println!("STACK ARGUMENTS");
             match arg {
                 Data::Number(n) =>{
                     generator.code_assembler.mov(rax, n.to_owned())?;
@@ -441,13 +442,13 @@ fn save_registers(mut number_of_args: u64, generator: &mut CodeGenerator) -> Res
     let mut saved_vec = vec![];
 
     #[cfg(target_os = "windows")]
-    let registers = [rcx, rdx, r8, r9, r10, r11];
+    let registers = [rcx, rdx, r8, r9, rsi, rdi, r10, r11];
 
     #[cfg(target_os = "windows")]
     let max_reg_args = 4;
 
     #[cfg(target_os = "linux")]
-    let registers = [rcx, rdx, rsi, rsp, r8, r9, r10, r11];
+    let registers = [rdi, rsi, rdx, rcx, r8, r9, r10, r11];
 
     #[cfg(target_os = "linux")]
     let max_reg_args = 6;
@@ -457,15 +458,15 @@ fn save_registers(mut number_of_args: u64, generator: &mut CodeGenerator) -> Res
         number_of_args = max_reg_args;
     }
 
-    let mut args = 0;
+    let mut saved = 1;
     for reg in registers{
-        //TODO fix variable save
-        if generator.variable_allocator.is_allocated(reg) || args < number_of_args || true {
+        if generator.variable_allocator.is_allocated(reg) || saved < number_of_args  {
             generator.code_assembler.push(reg)?;
             saved_vec.push(reg);
+            saved += 1;
         }
-        args += 1;
     }
+
     Ok(saved_vec)
 }
 
@@ -486,22 +487,28 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
 
     let saved_regs = save_registers(jit_args.len() as u64, generator)?;
     let pushed_args = set_arguments(&jit_args, line, generator)?;
-    generator.code_assembler.mov(rbx, rdi)?;
-    generator.code_assembler.push(rdi)?;
-    generator.code_assembler.mov(rdi, rbx)?;
+    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+        //fix stack allignment
+        generator.code_assembler.push(rbx)?;
+    }
     generator.code_assembler.call(jit::jit_callback as u64)?;
-    generator.code_assembler.pop(rdi)?;
+    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+        generator.code_assembler.pop(rbx)?;
+    }
     unset_arguments(pushed_args, generator)?;
     restore_registers(saved_regs, generator)?;
 
 
     let saved_regs = save_registers(args.len() as u64, generator)?;
     let pushed_args = set_arguments(args, line, generator)?;
-    generator.code_assembler.mov(rbx, rdi)?;
-    generator.code_assembler.push(rdi)?;
-    generator.code_assembler.mov(rdi, rbx)?;
+    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+        //fix stack allignment
+        generator.code_assembler.push(rbx)?;
+    }
     generator.code_assembler.call(rax)?;
-    generator.code_assembler.pop(rdi)?;
+    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+        generator.code_assembler.pop(rbx)?;
+    }
     unset_arguments(pushed_args,  generator)?;
     restore_registers(saved_regs, generator)?;
 

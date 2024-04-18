@@ -7,11 +7,19 @@ mod ir;
 mod ssa;
 mod jit;
 mod predefined_functions;
+
+
 fn main() {
 
     let code = "
+
+    fun test(a, b){
+        cool();
+    }
+
     fun main(a, b) {
         cool();
+        test(a, b);
         return a + b;
     }
     ";

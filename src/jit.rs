@@ -4,6 +4,7 @@ use bimap::BiMap;
 use crate::memory::Executable;
 use crate::memory::ExecuteableMemory;
 use crate::memory::Writeable;
+use crate::parser::Function;
 use crate::ssa;
 use crate::ir;
 use crate::asm;
@@ -139,6 +140,7 @@ impl FunctionTracker {
 
 
 }
+
 
 #[no_mangle]
 pub extern "C" fn jit_callback(function_tracker: &mut FunctionTracker, function_id: FunctionId) -> FunctionAddress{
