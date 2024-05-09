@@ -58,7 +58,7 @@ struct Opt {
 }
 
 
-fn execute_code(code: &str, args: Vec<i64>) {
+fn execute_code(code: &str, args: Vec<i64>) -> Result<i64, ()>{
     debug!("Lexing and parsing code");
     let parse_res = parser::parse(&mut lexer::lex(&code));
 
@@ -66,7 +66,7 @@ fn execute_code(code: &str, args: Vec<i64>) {
         Ok(p) => p,
         Err(err) => {
             error!("Parsing failed: {}", err);
-            return;
+            return Err(());
         }
     };
 
@@ -77,7 +77,7 @@ fn execute_code(code: &str, args: Vec<i64>) {
         Ok(_) => (),
         Err(err) => {
             error!("Semantic check failed: {}", err);
-            return;
+            return Err(());;
         }
     };
 
@@ -92,9 +92,11 @@ fn execute_code(code: &str, args: Vec<i64>) {
         Ok(value) => {
             debug!("Return value:");
             println!("{}", value);
+            Ok(value)
         },
         Err(err) => {
             error!("Error occured during execution: {}", err);
+            Err(())
         }
     }
 }
@@ -109,5 +111,26 @@ fn main() {
 
     debug!("Reading source file");
     let code = fs::read_to_string(opt.file).expect("Couldn't read source code file");
-    execute_code(&code, opt.args);
+    match execute_code(&code, opt.args) {
+        Err(()) => (),
+        Ok(_) => ()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_code_1() {
+        let code = fs::read_to_string("test/test1.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![1, 2]).is_ok(), true);
+    }
+
+    #[test]
+    fn stack_arguments() {
+        let code = fs::read_to_string("test/test2.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![]).is_ok(), true);
+    }
+
 }
