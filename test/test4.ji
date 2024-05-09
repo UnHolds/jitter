@@ -1,3 +1,4 @@
+//this functions tests if the parameter are accessed in the right way (stack align)
 fun test1(a, b, c, d, e, f, g, h){
     return a + b + c + d + e + f + g + h;
 }

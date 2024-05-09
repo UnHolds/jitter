@@ -1,3 +1,5 @@
+//this function tests if the parameter a accessed in the right way
+
 fun test1(a, b, c, d, e, f, g, h, i){
     return a + b + c + d + e + f + g + h + i;
 }

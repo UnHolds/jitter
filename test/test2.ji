@@ -1,10 +1,13 @@
-fun test3(a, b, c, d, e, f, g, h, i){
+// This code tests if the parameter destroy thhe call
+
+
+fun test3(a, b, c, d, e, f, g, h){
     cool();
 }
 
 fun test2(a, b, c, d, e, f, g, h, i){
-    test3(a, b, c, d, e, f, g, h, i);
-    test3(a, b, c, d, e, f, g, h, i);
+    test3(a, b, c, d, e, f, g, h);
+    test3(a, b, c, d, e, f, g, h);
     cool();
 }
 
