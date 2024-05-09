@@ -5,6 +5,6 @@ fun test1(a, b, c, d, e, f, g, h){
 
 fun main() {
     a = test1(1, 2, 3, 4, 5, 6, 7, 8);
-    print_num(a);
+    println_num(a);
     return a;
 }

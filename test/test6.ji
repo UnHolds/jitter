@@ -16,6 +16,6 @@ fun main() {
     o = 15;
     p = 16;
     a = a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p;
-    print_num(a);
+    println_num(a);
     return a;
 }
