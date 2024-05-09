@@ -19,7 +19,8 @@ pub struct FunctionTracker{
     id_external_fun_mapping: HashMap<FunctionId, FunctionAddress>,
     id_memory_mapping: HashMap<FunctionId, ExecuteableMemory>,
     program: ssa::SsaProgram,
-    print_ir: bool
+    print_ir: bool,
+    print_asm: bool
 }
 
 pub struct MainFunction {
@@ -97,7 +98,7 @@ impl MainFunction {
 
 
 impl FunctionTracker {
-    pub fn new(program: ssa::SsaProgram, print_ir: bool) -> Self {
+    pub fn new(program: ssa::SsaProgram, print_ir: bool, print_asm: bool) -> Self {
         let mut name_id_mapping = BiMap::new();
         for (idx, name) in program.functions.iter().map(|f| f.name.to_owned() ).enumerate() {
             name_id_mapping.insert(name, idx as i64);
@@ -117,7 +118,8 @@ impl FunctionTracker {
             id_external_fun_mapping: id_external_fun_mapping,
             id_memory_mapping: HashMap::new(),
             program: program,
-            print_ir: print_ir
+            print_ir: print_ir,
+            print_asm: print_asm
         }
     }
 
@@ -138,7 +140,7 @@ impl FunctionTracker {
     }
 
     fn complile_function(&mut self, id: i64) -> extern "C" fn() -> i64 {
-        let name = self.name_id_mapping.get_by_right(&id).unwrap();
+        let name = self.name_id_mapping.get_by_right(&id).unwrap().clone();
 
         debug!("Compiling function: {} with id {}", name, id);
 
@@ -153,6 +155,13 @@ impl FunctionTracker {
 
         let is = asm::generate(&ir, &fun.parameters, self).unwrap();
         let bytes = asm::assemble(&is, 0).unwrap();
+
+        if self.print_asm {
+            println!("\n\n##### Bytes Output Start [Function: {}] #####", name);
+            asm::print_decoded_bytes(&bytes, 0x0);
+            println!("##### Bytes Output End [Function: {}] #####", name);
+        }
+
         let mut memory = memory::ExecuteableMemory::new(bytes.len());
         memory.write(&bytes);
         let compiled_function = memory.as_function();

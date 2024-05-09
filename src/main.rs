@@ -60,9 +60,13 @@ struct Opt {
     #[structopt(short = "s", long = "print-ssa")]
     print_ssa: bool,
 
-    /// prints the converted ssa form of the progrm
+    /// prints the converted ir form of the functions
     #[structopt(short = "i", long = "print-ir")]
     print_ir: bool,
+
+    /// prints the decoded bytes (assembly)
+    #[structopt(short = "a", long = "print-asm")]
+    print_asm: bool,
 
     /// arguments for the passed program
     #[structopt()]
@@ -70,7 +74,7 @@ struct Opt {
 }
 
 
-fn execute_code(code: &str, args: Vec<i64>, print_parse: bool, print_ssa: bool, print_ir: bool) -> Result<i64, ()>{
+fn execute_code(code: &str, args: Vec<i64>, print_parse: bool, print_ssa: bool, print_ir: bool, print_asm: bool) -> Result<i64, ()>{
     debug!("Lexing and parsing code");
     let parse_res = parser::parse(&mut lexer::lex(&code));
 
@@ -108,7 +112,7 @@ fn execute_code(code: &str, args: Vec<i64>, print_parse: bool, print_ssa: bool, 
         println!("##### SSA Output End #####");
     }
 
-    let mut function_tracker = jit::FunctionTracker::new(program_ssa, print_ir);
+    let mut function_tracker = jit::FunctionTracker::new(program_ssa, print_ir, print_asm);
     let mut main_function = function_tracker.get_main_function();
     debug!("Executing main function");
     let return_value = main_function.execute(args);
@@ -135,7 +139,7 @@ fn main() {
 
     debug!("Reading source file");
     let code = fs::read_to_string(opt.file).expect("Couldn't read source code file");
-    match execute_code(&code, opt.args, opt.print_parse, opt.print_ssa, opt.print_ir) {
+    match execute_code(&code, opt.args, opt.print_parse, opt.print_ssa, opt.print_ir, opt.print_asm) {
         Err(()) => (),
         Ok(_) => ()
     }
@@ -148,37 +152,37 @@ mod tests {
     #[test]
     fn basic_code_1() {
         let code = fs::read_to_string("test/test1.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![1, 2], false, false, false).is_ok(), true);
+        assert_eq!(execute_code(&code, vec![1, 2], false, false, false, false).is_ok(), true);
     }
 
     #[test]
     fn stack_arguments_1() {
         let code = fs::read_to_string("test/test2.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![], false, false, false).is_ok(), true);
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).is_ok(), true);
     }
 
     #[test]
     fn stack_arguments_2() {
         let code = fs::read_to_string("test/test3.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![], false, false, false).unwrap(), 45);
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 45);
     }
 
     #[test]
     fn stack_arguments_3() {
         let code = fs::read_to_string("test/test4.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![], false, false, false).unwrap(), 36);
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 36);
     }
 
     #[test]
     fn stack_spilling_1() {
         let code = fs::read_to_string("test/test5.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![], false, false, false).unwrap(), 120);
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 120);
     }
 
     #[test]
     fn stack_spilling_2() {
         let code = fs::read_to_string("test/test6.ji").expect("Couldn't read source code file");
-        assert_eq!(execute_code(&code, vec![], false, false, false).unwrap(), 136);
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 136);
     }
 
 }

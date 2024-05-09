@@ -323,7 +323,7 @@ pub fn check(program: &parser::Program) -> SemanticResult {
                 check_variable_use_before_init(&mut vars, &f.block)?;
                 check_if_function_exist_on_call(&declared_function_names_and_arg_count, &f.block)?;
             }
-            parser::Function::External(f) => ()
+            parser::Function::External(_) => ()
         }
     }
     Ok(())
