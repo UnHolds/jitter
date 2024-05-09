@@ -22,7 +22,7 @@ impl From<ParseIntError> for LexingError {
 
 #[derive(Logos, Debug, PartialEq, Eq, Clone)]
 #[logos(error = LexingError)]
-#[logos(skip r"[ \t\n\f]+")]
+#[logos(skip r"[ \t\n\r\f]+")]
 pub enum Token {
     #[token("{")]
     OpeningCurlyBracket,
