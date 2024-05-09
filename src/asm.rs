@@ -186,6 +186,33 @@ fn generate_subtraction(res_var: &String, data1: &ir::Data, data2: &ir::Data, li
     Ok(())
 }
 
+fn generate_division(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
+    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    generate_idiv(data1, data2, line, generator)?;
+    move_to(res_loc, DataLocation::Register(rax), generator)?;
+    generator.code_assembler.pop(rdx)?;
+    Ok(())
+}
+
+fn generate_modulo(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
+    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    generate_idiv(data1, data2, line, generator)?;
+    move_to(res_loc, DataLocation::Register(rdx), generator)?;
+    generator.code_assembler.pop(rdx)?;
+    Ok(())
+}
+
+
+fn generate_idiv(data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
+    move_to(VariableLocation::Register(rax), get_data(data1, line, generator), generator)?;
+    move_to(VariableLocation::Register(rax), get_data(data1, line, generator), generator)?;
+    move_to(VariableLocation::Register(rbx), get_data(data2, line, generator), generator)?;
+    generator.code_assembler.push(rdx)?;
+    generator.code_assembler.mov(rdx, 0 as i64)?;
+    generator.code_assembler.idiv(rbx)?;
+    Ok(())
+}
+
 
 fn generate_multiplication(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
     let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
@@ -366,6 +393,8 @@ fn generate_assignment(res_var: &String, data: &ir::Data, line: u64, generator: 
     move_to(res_loc, data, generator)?;
     Ok(())
 }
+
+
 
 fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
     let data_loc = get_data(data, line, generator);
@@ -599,10 +628,10 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
                 generate_multiplication(res_var, data1, data2, line as u64, &mut generator)?;
             }
             ir::IrInstruction::Division(res_var, data1, data2) => {
-                panic!("division not implemented yet (ASM)")
+                generate_division(res_var, data1, data2, line as u64, &mut generator)?;
             }
             ir::IrInstruction::Modulo(res_var, data1, data2) => {
-                panic!("modulo not implemented yet (ASM)")
+                generate_modulo(res_var, data1, data2, line as u64, &mut generator)?;
             }
             ir::IrInstruction::Greater(res_var, data1, data2) => {
                 generate_greater(res_var, data1, data2, line as u64, &mut generator)?;
