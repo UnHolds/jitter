@@ -17,13 +17,13 @@ pub enum DataLocation {
     Number(i64)
 }
 
-fn get_data(data: &ir::Data, line: u64,  var_allocator: &mut var_allocator::VariableAllocator, lifetime_checker: &mut LifetimeChecker) -> DataLocation {
+fn get_data(data: &ir::Data, line: u64,  generator: &mut CodeGenerator) -> DataLocation {
     match data {
         ir::Data::Number(n) => {
             DataLocation::Number(n.to_owned())
         },
         ir::Data::Variable(v) => {
-            match var_allocator.get(v, line, lifetime_checker) {
+            match generator.variable_allocator.get(v, line, &mut generator.lifetime_checker, &mut generator.code_assembler) {
                 var_allocator::VariableLocation::Register(r) => DataLocation::Register(r),
                 var_allocator::VariableLocation::Stack(s) => DataLocation::Stack(rbp + s)
             }
@@ -36,7 +36,10 @@ fn move_to(to: VariableLocation, from: DataLocation, generator: &mut CodeGenerat
         DataLocation::Number(n) => {
             match to {
                 VariableLocation::Register(r) => generator.code_assembler.mov(r, n)?,
-                VariableLocation::Stack(s) =>  generator.code_assembler.mov(rbp + s, n as i32)?,
+                VariableLocation::Stack(s) => {
+                    generator.code_assembler.mov(rax, n)?;
+                    generator.code_assembler.mov(rbp + s, rax)?
+                },
             }
         }
         DataLocation::Register(sr) => {
@@ -73,7 +76,7 @@ fn generate_jump(label: &String, generator: &mut CodeGenerator) -> Result<(), Ic
 }
 
 fn generate_jump_false(data: &ir::Data, label: &String, line: u64,  generator: &mut CodeGenerator) -> Result<(), IcedError> {
-    let d = get_data(data, line as u64, &mut generator.variable_allocator, &mut generator.lifetime_checker);
+    let d = get_data(data, line as u64, generator);
     match d {
         DataLocation::Number(n) => {
             generator.code_assembler.mov(rax, n)?;
@@ -115,14 +118,17 @@ fn generate_label(label: &String, generator: &mut CodeGenerator) -> Result<(), I
 }
 
 fn generate_addition(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
-    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
-    move_to(res_loc, get_data(data1, line, &mut generator.variable_allocator, &mut generator.lifetime_checker), generator)?;
+    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    move_to(res_loc, get_data(data1, line, generator), generator)?;
 
-    match get_data(data2, line, &mut generator.variable_allocator, &mut generator.lifetime_checker) {
+    match get_data(data2, line, generator) {
         DataLocation::Number(n) => {
             match res_loc {
                 VariableLocation::Register(r) => generator.code_assembler.add( r, n as i32)?,
-                VariableLocation::Stack(s) => generator.code_assembler.add(rbp + s, n as i32)?,
+                VariableLocation::Stack(s) => {
+                    generator.code_assembler.mov(rbx, n)?;
+                    generator.code_assembler.add(rbp + s, rax)?
+                },
             }
         },
         DataLocation::Register(rr) => {
@@ -147,14 +153,17 @@ fn generate_addition(res_var: &String, data1: &ir::Data, data2: &ir::Data, line:
 
 
 fn generate_subtraction(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
-    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
-    move_to(res_loc, get_data(data1, line, &mut generator.variable_allocator, &mut generator.lifetime_checker), generator)?;
+    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    move_to(res_loc, get_data(data1, line, generator), generator)?;
 
-    match get_data(data2, line, &mut generator.variable_allocator, &mut generator.lifetime_checker) {
+    match get_data(data2, line, generator) {
         DataLocation::Number(n) => {
             match res_loc {
                 VariableLocation::Register(r) => generator.code_assembler.sub( r, n as i32)?,
-                VariableLocation::Stack(s) => generator.code_assembler.sub(rbp + s, n as i32)?,
+                VariableLocation::Stack(s) => {
+                    generator.code_assembler.mov(rbx, n)?;
+                    generator.code_assembler.sub(rbp + s, rax)?
+                },
             }
         },
         DataLocation::Register(rr) => {
@@ -179,10 +188,10 @@ fn generate_subtraction(res_var: &String, data1: &ir::Data, data2: &ir::Data, li
 
 
 fn generate_multiplication(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
-    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
-    move_to(res_loc, get_data(data1, line, &mut generator.variable_allocator, &mut generator.lifetime_checker), generator)?;
+    let res_loc = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    move_to(res_loc, get_data(data1, line, generator), generator)?;
 
-    match get_data(data2, line, &mut generator.variable_allocator, &mut generator.lifetime_checker) {
+    match get_data(data2, line, generator) {
         DataLocation::Number(n) => {
             match res_loc {
                 VariableLocation::Register(r) => {
@@ -225,8 +234,8 @@ fn generate_multiplication(res_var: &String, data1: &ir::Data, data2: &ir::Data,
 
 
 fn generate_compare(data1: &ir::Data, data2: &ir::Data, line: u64, generator: &mut CodeGenerator)-> Result<(), IcedError> {
-    let data1_loc = get_data(data1, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
-    let data2_loc = get_data(data2, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
+    let data1_loc = get_data(data1, line, generator);
+    let data2_loc = get_data(data2, line, generator);
 
     match data1_loc {
         DataLocation::Number(n1) => {
@@ -254,7 +263,10 @@ fn generate_compare(data1: &ir::Data, data2: &ir::Data, line: u64, generator: &m
         },
         DataLocation::Stack(s1) => {
             match data2_loc {
-                DataLocation::Number(n2) => generator.code_assembler.cmp(s1, n2 as i32)?,
+                DataLocation::Number(n2) => {
+                    generator.code_assembler.mov(rbx, n2)?;
+                    generator.code_assembler.cmp(s1, rbx)?
+                },
                 DataLocation::Register(r2) => generator.code_assembler.cmp(s1, r2)?,
                 DataLocation::Stack(s2) => {
                     generator.code_assembler.mov(rax, s1)?;
@@ -268,7 +280,7 @@ fn generate_compare(data1: &ir::Data, data2: &ir::Data, line: u64, generator: &m
 }
 
 fn store_rax_in_var(var: &String, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
-    let res_loc: VariableLocation = generator.variable_allocator.get(&var, line, &mut generator.lifetime_checker);
+    let res_loc: VariableLocation = generator.variable_allocator.get(&var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
     match res_loc {
         VariableLocation::Register(r) => generator.code_assembler.mov(r, rax)?,
         VariableLocation::Stack(s) => generator.code_assembler.mov(rbp + s, rax)?
@@ -349,14 +361,14 @@ fn generate_or(res_var: &String, data1: &ir::Data, data2: &ir::Data, line: u64, 
 }
 
 fn generate_assignment(res_var: &String, data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
-    let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
-    let data =  get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
+    let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
+    let data =  get_data(data, line, generator);
     move_to(res_loc, data, generator)?;
     Ok(())
 }
 
 fn generate_return(data: &ir::Data, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
-    let data_loc = get_data(data, line, &mut generator.variable_allocator, &mut generator.lifetime_checker);
+    let data_loc = get_data(data, line, generator);
     move_to(VariableLocation::Register(rax), data_loc, generator)?;
     //restore register
     generator.code_assembler.mov(rbx, rbp)?;
@@ -399,7 +411,7 @@ fn set_arguments(args: &Vec<Data>, line: u64, generator: &mut CodeGenerator) -> 
             match arg {
                 Data::Number(n) => generator.code_assembler.mov(arg_regs[i], n.to_owned())?,
                 Data::Variable(v) => {
-                    match generator.variable_allocator.get(v, line, &mut generator.lifetime_checker){
+                    match generator.variable_allocator.get(v, line, &mut generator.lifetime_checker, &mut generator.code_assembler){
                         VariableLocation::Register(r) => generator.code_assembler.mov(arg_regs[i], r)?,
                         VariableLocation::Stack(s) => generator.code_assembler.mov(arg_regs[i], rbp + s)?
                     };
@@ -413,7 +425,7 @@ fn set_arguments(args: &Vec<Data>, line: u64, generator: &mut CodeGenerator) -> 
                     generator.code_assembler.push(rbx)?
                 },
                 Data::Variable(v) => {
-                    match generator.variable_allocator.get(v, 0, &mut generator.lifetime_checker){
+                    match generator.variable_allocator.get(v, 0, &mut generator.lifetime_checker, &mut generator.code_assembler){
                         VariableLocation::Register(r) => generator.code_assembler.push(r)?,
                         VariableLocation::Stack(s) => {
                             generator.code_assembler.mov(rbx, rbp + s)?;
@@ -493,7 +505,7 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
 
     let saved_regs = save_registers(jit_args.len() as u64, generator)?;
 
-    if (std::cmp::max(jit_args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64) % 2 == 0{
+    if (std::cmp::max(jit_args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64 + generator.variable_allocator.get_num_stackvars()) % 2 == 0{
         //fix stack allignment
         generator.code_assembler.push(rbx)?;
     }
@@ -501,7 +513,7 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
     let pushed_args = set_arguments(&jit_args, line, generator)?;
 
     generator.code_assembler.call(jit::jit_callback as u64)?;
-    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+    if (pushed_args + saved_regs.len() as u64 + generator.variable_allocator.get_num_stackvars()) % 2 == 0{
         generator.code_assembler.pop(rbx)?;
     }
     unset_arguments(pushed_args, generator)?;
@@ -509,19 +521,19 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
 
 
     let saved_regs = save_registers(args.len() as u64, generator)?;
-    if (std::cmp::max(args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64) % 2 == 0{
+    if (std::cmp::max(args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64 + generator.variable_allocator.get_num_stackvars()) % 2 == 0{
         //fix stack allignment
         generator.code_assembler.push(rbx)?;
     }
     let pushed_args = set_arguments(args, line, generator)?;
     generator.code_assembler.call(rax)?;
-    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+    if (pushed_args + saved_regs.len() as u64 + generator.variable_allocator.get_num_stackvars()) % 2 == 0{
         generator.code_assembler.pop(rbx)?;
     }
     unset_arguments(pushed_args,  generator)?;
     restore_registers(saved_regs, generator)?;
 
-    let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker);
+    let res_loc: VariableLocation = generator.variable_allocator.get(&res_var, line, &mut generator.lifetime_checker, &mut generator.code_assembler);
     match res_loc {
         VariableLocation::Register(r) => generator.code_assembler.mov(r, rax)?,
         VariableLocation::Stack(s) => generator.code_assembler.mov(rbp + s, rax)?
@@ -565,7 +577,6 @@ pub fn generate(instructions: &Vec<ir::IrInstruction>, parameters: &parser::Para
     generator.code_assembler.push(r15)?;
 
     for (line, inst) in instructions.iter().enumerate() {
-
         match inst {
             ir::IrInstruction::Jump(label) => {
                 generate_jump(label, &mut generator)?;

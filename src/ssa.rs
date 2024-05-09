@@ -186,8 +186,8 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
     for statement in block {
         match statement {
             parser::Statement::Assignment(a) => {
-                let new_var = var_tracker.get_new(&a.variable_name.to_owned());
                 let new_inner_block = convert_expression(&a.expression, var_tracker);
+                let new_var = var_tracker.get_new(&a.variable_name.to_owned());
                 new_block.push(SsaStatement::Assignment(SsaAssignment { variable_name: new_var, expression: new_inner_block }));
             },
             parser::Statement::FunctionCall(f) => {
@@ -240,6 +240,7 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
 }
 
 
+#[derive(Debug)]
 pub struct SsaProgram {
     pub functions: Vec<SsaFunction>,
     pub external_functions: Vec<ExternalFunction>

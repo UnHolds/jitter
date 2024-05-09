@@ -145,4 +145,16 @@ mod tests {
         assert_eq!(execute_code(&code, vec![]).unwrap(), 36);
     }
 
+    #[test]
+    fn stack_spilling_1() {
+        let code = fs::read_to_string("test/test5.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![]).unwrap(), 120);
+    }
+
+    #[test]
+    fn stack_spilling_2() {
+        let code = fs::read_to_string("test/test6.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![]).unwrap(), 136);
+    }
+
 }

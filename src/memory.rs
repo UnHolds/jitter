@@ -18,7 +18,7 @@ pub trait Writeable {
 }
 
 pub trait Executable {
-    fn as_function(&mut self) -> fn() -> i64;
+    fn as_function(&mut self) -> extern "C" fn() -> i64;
 }
 
 impl ExecuteableMemory {
@@ -59,7 +59,7 @@ impl Memory for ExecuteableMemory {
 }
 
 impl Executable for ExecuteableMemory {
-    fn as_function(&mut self) -> fn() -> i64 {
+    fn as_function(&mut self) -> extern "C" fn() -> i64 {
         unsafe {
             core::mem::transmute(self.address)
         }

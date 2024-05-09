@@ -114,7 +114,7 @@ impl VariableAllocator {
         VariableAllocator {
             free_registers,
             variables,
-            next_stack_variable_offset: -32,
+            next_stack_variable_offset: -56,
         }
     }
 
@@ -139,11 +139,11 @@ impl VariableAllocator {
                 VariableLocation::Stack(_) => ()
             }
         }
-        self.variables.retain(|v| v.lifetime_end >= line || v.location == VariableLocation::Stack(0));
+        self.variables.retain(|v| v.lifetime_end >= line || match v.location {VariableLocation::Register(_) => false, VariableLocation::Stack(_) => true});
     }
 
 
-    fn allcoate(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker) -> VariableLocation {
+    fn allcoate(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker, code_assembler: &mut CodeAssembler) -> VariableLocation {
         self.check(line);
         let lifetime_end = lifetime_checker.get_end_lifetime(name) as u64;
         if self.free_registers.len() > 0 {
@@ -152,18 +152,22 @@ impl VariableAllocator {
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
             location
         }else{
-            println!("STACK ALLOC NOT GUD");
             let location = VariableLocation::Stack(self.next_stack_variable_offset);
             self.next_stack_variable_offset = self.next_stack_variable_offset - 8;
             self.variables.push(AllocatedVariable { location: location, lifetime_end: lifetime_end, name: name.to_owned() });
+            code_assembler.push(rbx).unwrap();
             location
         }
     }
 
-    pub fn get(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker) -> VariableLocation {
+    pub fn get(&mut self, name: &str, line: u64, lifetime_checker: &mut lifetime::LifetimeChecker, code_assembler: &mut CodeAssembler) -> VariableLocation {
         match self.variables.iter().find(|v| v.name == name) {
-            None => self.allcoate(name, line, lifetime_checker),
+            None => self.allcoate(name, line, lifetime_checker, code_assembler),
             Some(v) => v.location
         }
+    }
+
+    pub fn get_num_stackvars(&mut self) -> u64 {
+        self.variables.iter().filter(|v| match v.location {VariableLocation::Register(_) => false, VariableLocation::Stack(_) => true}).count() as u64
     }
 }

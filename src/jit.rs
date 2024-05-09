@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::mem;
 use bimap::BiMap;
 use log::debug;
+use std::arch::asm;
 use crate::memory::Executable;
 use crate::memory::ExecuteableMemory;
 use crate::memory::Writeable;
@@ -12,6 +13,7 @@ use crate::memory;
 pub type FunctionAddress = u64;
 pub type FunctionId = i64;
 
+
 pub struct FunctionTracker{
     name_id_mapping: BiMap<String, FunctionId>,
     id_external_fun_mapping: HashMap<FunctionId, FunctionAddress>,
@@ -20,7 +22,7 @@ pub struct FunctionTracker{
 }
 
 pub struct MainFunction {
-    function: fn() -> i64,
+    function: extern "C" fn() -> i64,
     num_args: u64,
 }
 
@@ -49,16 +51,43 @@ impl MainFunction {
             if args.len() as u64 != self.num_args {
                 return Err(JitError::InvalidNumberOfArguments(self.num_args, args.len() as u64))
             }
+            let rdi: i64;
+            let rsi: i64;
+            let rdx: i64;
+            let rcx: i64;
+            let r8: i64;
+            let r9: i64;
+            let r10: i64;
+            let r11: i64;
+            asm!("mov {}, rdi", out(reg) rdi);
+            asm!("mov {}, rsi", out(reg) rsi);
+            asm!("mov {}, rdx", out(reg) rdx);
+            asm!("mov {}, rcx", out(reg) rcx);
+            asm!("mov {}, r8", out(reg) r8);
+            asm!("mov {}, r9", out(reg) r9);
+            asm!("mov {}, r10", out(reg) r10);
+            asm!("mov {}, r11", out(reg) r11);
+
 
             let res = match args.len() {
                 0 => (self.function)(),
-                1 => mem::transmute::<fn() -> i64, fn(i64) -> i64>(self.function)(args[0]),
-                2 => mem::transmute::<fn() -> i64, fn(i64, i64) -> i64>(self.function)(args[0], args[1]),
-                3 => mem::transmute::<fn() -> i64, fn(i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2]),
-                4 => mem::transmute::<fn() -> i64, fn(i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3]),
-                5 => mem::transmute::<fn() -> i64, fn(i64, i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3], args[4]),
+                1 => mem::transmute::<extern "C" fn() -> i64, extern "C" fn(i64) -> i64>(self.function)(args[0]),
+                2 => mem::transmute::<extern "C" fn() -> i64, extern "C" fn(i64, i64) -> i64>(self.function)(args[0], args[1]),
+                3 => mem::transmute::<extern "C" fn() -> i64, extern "C" fn(i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2]),
+                4 => mem::transmute::<extern "C" fn() -> i64, extern "C" fn(i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3]),
+                5 => mem::transmute::<extern "C" fn() -> i64, extern "C" fn(i64, i64, i64, i64, i64) -> i64>(self.function)(args[0], args[1], args[2], args[3], args[4]),
                 _ => return Err(JitError::TooManyArguments)
             };
+
+            asm!("mov rsi, {}", in(reg) rdi);
+            asm!("mov rsi, {}", in(reg) rsi);
+            asm!("mov rdx, {}", in(reg) rdx);
+            asm!("mov rcx, {}", in(reg) rcx);
+            asm!("mov r8, {}", in(reg) r8);
+            asm!("mov r9, {}", in(reg) r9);
+            asm!("mov r10, {}", in(reg) r10);
+            asm!("mov r11, {}", in(reg) r11);
+
             Ok(res)
         }
     }
@@ -105,7 +134,7 @@ impl FunctionTracker {
         }
     }
 
-    fn complile_function(&mut self, id: i64) -> fn() -> i64 {
+    fn complile_function(&mut self, id: i64) -> extern "C" fn() -> i64 {
         let name = self.name_id_mapping.get_by_right(&id).unwrap();
 
         debug!("Compiling function: {} with id {}", name, id);
