@@ -11,6 +11,7 @@ use structopt::StructOpt;
 use std::str::FromStr;
 use std::path::PathBuf;
 use std::fs;
+use log::{debug, error};
 
 #[derive(Debug)]
 enum LogLevel {
@@ -49,7 +50,53 @@ struct Opt {
 
     /// The file that contains the source code
     #[structopt(parse(from_os_str))]
-    file: PathBuf
+    file: PathBuf,
+
+    /// arguments for the passed program
+    #[structopt()]
+    args: Vec<i64>
+}
+
+
+fn execute_code(code: &str, args: Vec<i64>) {
+    debug!("Lexing and parsing code");
+    let parse_res = parser::parse(&mut lexer::lex(&code));
+
+    let mut program = match parse_res {
+        Ok(p) => p,
+        Err(err) => {
+            error!("Parsing failed: {}", err);
+            return;
+        }
+    };
+
+    debug!("Adding predefined functions");
+    predefined_functions::add(&mut program);
+    let semantic_res = semantic::check(&program);
+    match semantic_res {
+        Ok(_) => (),
+        Err(err) => {
+            error!("Semantic check failed: {}", err);
+            return;
+        }
+    };
+
+    debug!("Converting program to SSA form");
+    let program_ssa = ssa::convert(&program);
+
+    let mut function_tracker = jit::FunctionTracker::new(program_ssa);
+    let mut main_function = function_tracker.get_main_function();
+    debug!("Executing main function");
+    let return_value = main_function.execute(args);
+    match return_value {
+        Ok(value) => {
+            debug!("Return value:");
+            println!("{}", value);
+        },
+        Err(err) => {
+            error!("Error occured during execution: {}", err);
+        }
+    }
 }
 
 
@@ -60,15 +107,7 @@ fn main() {
     }
     env_logger::init();
 
+    debug!("Reading source file");
     let code = fs::read_to_string(opt.file).expect("Couldn't read source code file");
-
-    let mut program = parser::parse(&mut lexer::lex(&code)).unwrap();
-    predefined_functions::add(&mut program);
-    semantic::check(&program).unwrap();
-    let program_ssa = ssa::convert(&program);
-    let mut function_tracker = jit::FunctionTracker::new(program_ssa);
-    let mut main_function = function_tracker.get_main_function();
-    println!("Executing!");
-    println!("Return: {:?}", main_function.execute([2, 6].to_vec()));
-
+    execute_code(&code, opt.args);
 }
