@@ -15,7 +15,7 @@
           "kind": "bin"
         }
       },
-      "args": ["test/test3.ji", "-l", "debug"],
+      "args": ["test/test2.ji", "-l", "debug"],
       "cwd": "${workspaceFolder}"
     },
     {

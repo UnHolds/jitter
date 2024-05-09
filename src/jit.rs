@@ -19,6 +19,7 @@ pub struct FunctionTracker{
     id_external_fun_mapping: HashMap<FunctionId, FunctionAddress>,
     id_memory_mapping: HashMap<FunctionId, ExecuteableMemory>,
     program: ssa::SsaProgram,
+    print_ir: bool
 }
 
 pub struct MainFunction {
@@ -96,7 +97,7 @@ impl MainFunction {
 
 
 impl FunctionTracker {
-    pub fn new(program: ssa::SsaProgram) -> Self {
+    pub fn new(program: ssa::SsaProgram, print_ir: bool) -> Self {
         let mut name_id_mapping = BiMap::new();
         for (idx, name) in program.functions.iter().map(|f| f.name.to_owned() ).enumerate() {
             name_id_mapping.insert(name, idx as i64);
@@ -115,7 +116,8 @@ impl FunctionTracker {
             name_id_mapping: name_id_mapping,
             id_external_fun_mapping: id_external_fun_mapping,
             id_memory_mapping: HashMap::new(),
-            program: program
+            program: program,
+            print_ir: print_ir
         }
     }
 
@@ -142,6 +144,13 @@ impl FunctionTracker {
 
         let fun = self.program.functions.iter().find(|f| f.name == name.to_owned()).unwrap().clone();
         let ir = ir::transform(&fun);
+
+        if self.print_ir {
+            println!("\n\n##### IR Output Start [Function: {}] #####", name);
+            println!("{:#?}", ir);
+            println!("##### IR Output End [Function: {}] #####", name);
+        }
+
         let is = asm::generate(&ir, &fun.parameters, self).unwrap();
         let bytes = asm::assemble(&is, 0).unwrap();
         let mut memory = memory::ExecuteableMemory::new(bytes.len());
