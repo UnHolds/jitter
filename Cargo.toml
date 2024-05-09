@@ -12,3 +12,5 @@ winapi = { version = "0.3.9", features = ["memoryapi", "sysinfoapi", "errhandlin
 iced-x86 = { version ="1.21.0", features = ["code_asm"] }
 itertools = "0.12.1"
 bimap = "0.6.3"
+log = "0.4.21"
+env_logger = "0.11.3"

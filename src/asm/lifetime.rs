@@ -1,7 +1,7 @@
 
 use crate::ir;
 use crate::parser;
-
+use log::debug;
 
 pub struct Lifetime {
     name: String,
@@ -20,9 +20,9 @@ impl LifetimeChecker {
     }
 
     pub fn print_all(&mut self) {
-        println!("\nLifetime-Checker:");
+        debug!("\nLifetime-Checker:");
         for lifetime in &self.lifetimes {
-            println!("Var: {} - Start: {}, End: {}", lifetime.name, lifetime.start, lifetime.end);
+            debug!("Var: {} - Start: {}, End: {}", lifetime.name, lifetime.start, lifetime.end);
         }
     }
 

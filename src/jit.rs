@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::mem;
 use bimap::BiMap;
+use log::debug;
 use crate::memory::Executable;
 use crate::memory::ExecuteableMemory;
 use crate::memory::Writeable;
-use crate::parser::Function;
 use crate::ssa;
 use crate::ir;
 use crate::asm;
@@ -108,7 +108,7 @@ impl FunctionTracker {
     fn complile_function(&mut self, id: i64) -> fn() -> i64 {
         let name = self.name_id_mapping.get_by_right(&id).unwrap();
 
-        println!("Compiling function: {} with id {}", name, id);
+        debug!("Compiling function: {} with id {}", name, id);
 
         let fun = self.program.functions.iter().find(|f| f.name == name.to_owned()).unwrap().clone();
         let ir = ir::transform(&fun);

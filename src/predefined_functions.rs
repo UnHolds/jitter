@@ -8,7 +8,7 @@ pub struct ExternalFunction {
 }
 
 fn cool(){
-    println!("cool");
+    println!("cool!");
 }
 
 pub fn add(program: &mut parser::Program) {

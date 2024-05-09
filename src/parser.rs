@@ -491,7 +491,6 @@ mod tests {
     fn parser_expression_equals_and_not_equals() {
         let code = "1 == 2 != 3;";
         let mut lex = lexer::Token::lexer(code).peekable();
-        //println!("{:?}", parse_expression(&mut lex))
         assert_eq!(parse_expression(&mut lex), Ok(Expression::NotEquals(Box::new((Expression::Equals(Box::new((Expression::Number(1), Expression::Number(2)))), Expression::Number(3))))))
     }
 
