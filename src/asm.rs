@@ -25,7 +25,7 @@ fn get_data(data: &ir::Data, line: u64,  var_allocator: &mut var_allocator::Vari
         ir::Data::Variable(v) => {
             match var_allocator.get(v, line, lifetime_checker) {
                 var_allocator::VariableLocation::Register(r) => DataLocation::Register(r),
-                var_allocator::VariableLocation::Stack(s) => DataLocation::Stack(rsp + s)
+                var_allocator::VariableLocation::Stack(s) => DataLocation::Stack(rbp + s)
             }
         }
     }
@@ -407,18 +407,17 @@ fn set_arguments(args: &Vec<Data>, line: u64, generator: &mut CodeGenerator) -> 
             };
         }else{
             pushed_args += 1;
-            println!("STACK ARGUMENTS");
             match arg {
                 Data::Number(n) =>{
-                    generator.code_assembler.mov(rax, n.to_owned())?;
-                    generator.code_assembler.push(rax)?
+                    generator.code_assembler.mov(rbx, n.to_owned())?;
+                    generator.code_assembler.push(rbx)?
                 },
                 Data::Variable(v) => {
                     match generator.variable_allocator.get(v, 0, &mut generator.lifetime_checker){
                         VariableLocation::Register(r) => generator.code_assembler.push(r)?,
                         VariableLocation::Stack(s) => {
-                            generator.code_assembler.mov(rax, rbp + s)?;
-                            generator.code_assembler.push(rax)?;
+                            generator.code_assembler.mov(rbx, rbp + s)?;
+                            generator.code_assembler.push(rbx)?;
                         }
                     };
                 }
@@ -480,17 +479,27 @@ fn restore_registers(saved_regs: Vec<AsmRegister64>, generator: &mut CodeGenerat
 
 fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>, function_tracker: &mut jit::FunctionTracker, line: u64, generator: &mut CodeGenerator) -> Result<(), IcedError> {
 
+    #[cfg(target_os = "windows")]
+    let num_arg_regs = 4;
+
+    #[cfg(target_os = "linux")]
+    let num_arg_regs = 6;
+
+
     let mut jit_args = vec![];
     let fun_id = function_tracker.get_id(fun_name);
     jit_args.push(Data::Number(function_tracker as *const _ as i64));
     jit_args.push(Data::Number(fun_id.to_owned()));
 
     let saved_regs = save_registers(jit_args.len() as u64, generator)?;
-    let pushed_args = set_arguments(&jit_args, line, generator)?;
-    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+
+    if (std::cmp::max(jit_args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64) % 2 == 0{
         //fix stack allignment
         generator.code_assembler.push(rbx)?;
     }
+
+    let pushed_args = set_arguments(&jit_args, line, generator)?;
+
     generator.code_assembler.call(jit::jit_callback as u64)?;
     if (pushed_args + saved_regs.len() as u64) % 2 == 0{
         generator.code_assembler.pop(rbx)?;
@@ -500,11 +509,11 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
 
 
     let saved_regs = save_registers(args.len() as u64, generator)?;
-    let pushed_args = set_arguments(args, line, generator)?;
-    if (pushed_args + saved_regs.len() as u64) % 2 == 0{
+    if (std::cmp::max(args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64) % 2 == 0{
         //fix stack allignment
         generator.code_assembler.push(rbx)?;
     }
+    let pushed_args = set_arguments(args, line, generator)?;
     generator.code_assembler.call(rax)?;
     if (pushed_args + saved_regs.len() as u64) % 2 == 0{
         generator.code_assembler.pop(rbx)?;

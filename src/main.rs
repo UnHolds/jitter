@@ -77,7 +77,7 @@ fn execute_code(code: &str, args: Vec<i64>) -> Result<i64, ()>{
         Ok(_) => (),
         Err(err) => {
             error!("Semantic check failed: {}", err);
-            return Err(());;
+            return Err(());
         }
     };
 
@@ -128,9 +128,21 @@ mod tests {
     }
 
     #[test]
-    fn stack_arguments() {
+    fn stack_arguments_1() {
         let code = fs::read_to_string("test/test2.ji").expect("Couldn't read source code file");
         assert_eq!(execute_code(&code, vec![]).is_ok(), true);
+    }
+
+    #[test]
+    fn stack_arguments_2() {
+        let code = fs::read_to_string("test/test3.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![]).unwrap(), 45);
+    }
+
+    #[test]
+    fn stack_arguments_3() {
+        let code = fs::read_to_string("test/test4.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![]).unwrap(), 36);
     }
 
 }

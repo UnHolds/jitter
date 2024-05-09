@@ -92,11 +92,13 @@ impl VariableAllocator {
         ].to_vec();
 
         let mut variables = vec![];
-        let mut offset = 16;
+
         #[cfg(target_os = "linux")]
         let number_of_register_arguments = 6;
         #[cfg(target_os = "windows")]
         let number_of_register_arguments = 4;
+
+        let mut offset = 8 + (parameters.len() as i64 - number_of_register_arguments as i64) * 8;
         //allocate the function parameters
         for (i, parameter) in parameters.iter().enumerate() {
             let lifetime_end = lifetime_checker.get_end_lifetime(parameter) as u64;
@@ -104,7 +106,7 @@ impl VariableAllocator {
                 //allocate parameter register
                 variables.push(AllocatedVariable { location: VariableLocation::Register(free_registers.pop().unwrap()), lifetime_end: lifetime_end, name: parameter.to_owned()});
             }else{
-                offset = offset + 8; //base offset = 16 and then every 8
+                offset = offset - 8; //base offset = 16 and then every 8
                 variables.push(AllocatedVariable { location: VariableLocation::Stack(offset), lifetime_end: lifetime_end, name: parameter.to_owned()});
             }
         }
