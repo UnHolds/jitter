@@ -504,7 +504,6 @@ fn generate_function_call(res_var: &String, fun_name: &String, args: &Vec<Data>,
     jit_args.push(Data::Number(fun_id.to_owned()));
 
     let saved_regs = save_registers(jit_args.len() as u64, generator)?;
-
     if (std::cmp::max(jit_args.len() as i64 - num_arg_regs, 0) as u64 + saved_regs.len() as u64 + generator.variable_allocator.get_num_stackvars()) % 2 == 0{
         //fix stack allignment
         generator.code_assembler.push(rbx)?;

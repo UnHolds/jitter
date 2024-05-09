@@ -51,6 +51,7 @@ impl MainFunction {
             if args.len() as u64 != self.num_args {
                 return Err(JitError::InvalidNumberOfArguments(self.num_args, args.len() as u64))
             }
+
             let rdi: i64;
             let rsi: i64;
             let rdx: i64;

@@ -7,11 +7,11 @@ pub struct ExternalFunction {
     pub address: u64
 }
 
-fn cool(){
+extern "C" fn cool(){
     println!("cool!");
 }
 
-fn print_num(i: i64){
+extern "C" fn print_num(i: i64){
     println!("{}", i);
 }
 

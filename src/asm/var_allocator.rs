@@ -2,6 +2,7 @@
 
 use core::fmt;
 use iced_x86::code_asm::*;
+use log::debug;
 use crate::parser;
 
 use crate::asm::lifetime;
@@ -106,7 +107,7 @@ impl VariableAllocator {
                 //allocate parameter register
                 variables.push(AllocatedVariable { location: VariableLocation::Register(free_registers.pop().unwrap()), lifetime_end: lifetime_end, name: parameter.to_owned()});
             }else{
-                offset = offset - 8; //base offset = 16 and then every 8
+                offset = offset - 8; //base offset
                 variables.push(AllocatedVariable { location: VariableLocation::Stack(offset), lifetime_end: lifetime_end, name: parameter.to_owned()});
             }
         }
@@ -168,6 +169,6 @@ impl VariableAllocator {
     }
 
     pub fn get_num_stackvars(&mut self) -> u64 {
-        self.variables.iter().filter(|v| match v.location {VariableLocation::Register(_) => false, VariableLocation::Stack(_) => true}).count() as u64
+        self.variables.iter().filter(|v| match v.location {VariableLocation::Register(_) => false, VariableLocation::Stack(v) => v < 0}).count() as u64
     }
 }
