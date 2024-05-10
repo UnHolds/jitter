@@ -92,6 +92,7 @@ fun main(a, b) {
 - `println_num(num)` - same as `print_num(num)` but adds a `\n` at the end
 - `print_char(char)` - prints the passed parameter `char` as a character (needs to be printable ascii value otherwise it will crash)
 - `println_char(char)` - same as `print_char(char)` but adds a `\n` at the end
+- `read_num()` - reads a number from stdin
 
 ## Contributing
 
