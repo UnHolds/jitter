@@ -85,6 +85,14 @@ fun main(a, b) {
   - Function Call => eg. `fun1(<parameters>)`
 - Block `<block>` => just a bunch of `<statements>`
 
+## Predefined Functions
+
+- `cool()` - Prints the string `"cool\n"`
+- `print_num(num)` - Prints the passed parameter `num` as an integer
+- `println_num(num)` - same as `print_num(num)` but adds a `\n` at the end
+- `print_char(char)` - prints the passed parameter `char` as a character (needs to be printable ascii value otherwise it will crash)
+- `println_char(char)` - same as `print_char(char)` but adds a `\n` at the end
+
 ## Contributing
 
 1. Found a problem?
