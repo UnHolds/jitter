@@ -17,12 +17,3 @@ Subtraction = Expression Expression
 Multiplication = Expression Expression
 Division = Expression Expression
 Modulo = Expression Expression
-
-TODO
-
-- Semantic check if num or args is okay
-  Predecende
-
-1. parenthesis
-2. muliplication division modulo
-3. addition subtraction
