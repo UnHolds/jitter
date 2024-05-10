@@ -100,6 +100,7 @@ pub enum Token {
     Return,
 
     #[regex("-?[0-9]+", |lex| lex.slice().parse())]
+    #[regex("'[ -~]'", |lex| lex.slice().as_bytes()[1] as i64)]
     Number(i64),
 
 }

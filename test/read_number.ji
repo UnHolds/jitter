@@ -1,0 +1,7 @@
+
+
+fun main() {
+    a = read_num();
+    println_char('A');
+    println_num(a);
+}
