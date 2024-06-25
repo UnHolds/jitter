@@ -1,0 +1,53 @@
+
+
+fun get_input() {
+    println_char(' ');
+    println_char(' ');
+    print_char('N');
+    print_char('u');
+    print_char('m');
+    print_char('b');
+    print_char('e');
+    print_char('r');
+    print_char(':');
+    print_char(' ');
+    return read_num();
+}
+
+fun fac(a) {
+    if(a == 0){
+        return 1;
+    }
+    return a * fac(a - 1);
+}
+
+fun print_result(in, res) {
+    println_char(' ');
+    print_char('I');
+    print_char('n');
+    print_char('p');
+    print_char('u');
+    print_char('t');
+    print_char(':');
+    print_char(' ');
+    println_num(in);
+
+    print_char('R');
+    print_char('e');
+    print_char('s');
+    print_char('u');
+    print_char('l');
+    print_char('t');
+    print_char(':');
+    print_char(' ');
+    println_num(res);
+}
+
+fun main() {
+    a = get_input();
+    while(a > 0) {
+        c = fac(a);
+        print_result(a, c);
+        a = get_input();
+    }
+}
