@@ -1,5 +1,5 @@
 use std::char::from_u32;
-
+use std::io::{self, Write};
 use crate::parser;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -9,34 +9,39 @@ pub struct ExternalFunction {
     pub address: u64
 }
 
-extern "C" fn cool() -> u64 {
+extern "C" fn cool() -> i64 {
     println!("cool!");
+    io::stdout().flush().unwrap();
     return 0;
 }
 
-extern "C" fn print_num(i: i64) -> u64 {
+extern "C" fn print_num(i: i64) -> i64 {
     print!("{}", i);
+    io::stdout().flush().unwrap();
     return 0;
 }
 
-extern "C" fn print_char(c: u32) -> u64 {
+extern "C" fn print_char(c: u32) -> i64 {
     let _c = from_u32(c).unwrap();
     print!("{}", _c);
+    io::stdout().flush().unwrap();
     return 0;
 }
 
-extern "C" fn println_num(i: i64) -> u64 {
+extern "C" fn println_num(i: i64) -> i64 {
     println!("{}", i);
+    io::stdout().flush().unwrap();
     return 0;
 }
 
-extern "C" fn println_char(c: u32) -> u64 {
+extern "C" fn println_char(c: u32) -> i64 {
     let _c = from_u32(c).unwrap();
     println!("{}", _c);
+    io::stdout().flush().unwrap();
     return 0;
 }
 
-extern "C" fn read_num() -> u64 {
+extern "C" fn read_num() -> i64 {
     let mut input_line = String::new();
     std::io::stdin()
         .read_line(&mut input_line)

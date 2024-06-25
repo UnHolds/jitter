@@ -131,6 +131,7 @@ fn execute_code(code: &str, args: Vec<i64>, print_parse: bool, print_ssa: bool, 
 
 
 fn main() {
+
     let opt = Opt::from_args();
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", opt.log_level.to_string())
@@ -183,6 +184,18 @@ mod tests {
     fn stack_spilling_2() {
         let code = fs::read_to_string("test/test6.ji").expect("Couldn't read source code file");
         assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 136);
+    }
+
+    #[test]
+    fn var_assignment_in_loop() {
+        let code = fs::read_to_string("test/test7.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 9);
+    }
+
+    #[test]
+    fn var_assignment_in_if() {
+        let code = fs::read_to_string("test/test8.ji").expect("Couldn't read source code file");
+        assert_eq!(execute_code(&code, vec![], false, false, false, false).unwrap(), 9);
     }
 
 }

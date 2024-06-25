@@ -1,0 +1,14 @@
+
+//this tests tests the phi nodes + variables that only exist in the loop
+fun main() {
+    a = 5;
+    d = 1;
+    while(a > 0){
+        a = a - 1;
+        c = 6;
+        b = 7;
+        d = 9;
+    }
+
+    return d;
+}

@@ -28,6 +28,16 @@ impl VariableTracker {
         format!("#var_{}_#{}",name, num)
     }
 
+    pub fn get_current_optinal(&mut self, name: &str) -> Option<String> {
+        let num = match self.vars.get(name) {
+            Some(n) => {
+                n.to_owned()
+            },
+            None => return None,
+        };
+        Some(format!("#var_{}_#{}",name, num))
+    }
+
     pub fn get_new(&mut self, name: &str) -> String {
         let num = match self.vars.get(name) {
             Some(n) => {
@@ -92,17 +102,23 @@ fn convert_expression(expression: &parser::Expression, var_tracker: &mut Variabl
     }
 }
 
-fn get_assigned_variables_in_block(block: &parser::Block) -> Vec<VariableName> {
+fn get_assigned_variables_in_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Vec<VariableName> {
     let mut vars = vec![];
     for statement in block {
         match statement {
-            parser::Statement::Assignment(a) => vars.push(a.variable_name.to_owned()),
+            parser::Statement::Assignment(a) => {
+                match var_tracker.get_current_optinal(&a.variable_name) {
+                    Some(_) => vars.push(a.variable_name.to_owned()),
+                    None => ()
+                }
+
+            },
             parser::Statement::FunctionCall(_) => (),
             parser::Statement::IfStatement(s) => {
-                vars.append(&mut get_assigned_variables_in_block(&s.block));
+                vars.append(&mut get_assigned_variables_in_block(&s.block, var_tracker));
             },
             parser::Statement::WhileLoop(l) => {
-                vars.append(&mut get_assigned_variables_in_block(&l.block));
+                vars.append(&mut get_assigned_variables_in_block(&l.block, var_tracker));
             },
             parser::Statement::Return(_) => ()
 
@@ -199,7 +215,7 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
             },
             parser::Statement::IfStatement(s) => {
                 let new_condition = convert_expression(&s.condition, var_tracker);
-                let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&s.block);
+                let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&s.block, var_tracker);
                 let outer_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
                 let new_inner_block = convert_block(&s.block, var_tracker);
                 let inner_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
@@ -213,7 +229,7 @@ fn convert_block(block: &parser::Block, var_tracker: &mut VariableTracker) -> Ss
             },
             parser::Statement::WhileLoop(l) => {
                 let new_condition = convert_expression(&l.condition, var_tracker);
-                let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&l.block);
+                let assigned_vars: Vec<VariableName> = get_assigned_variables_in_block(&l.block, var_tracker);
                 let outer_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
                 let new_inner_block = convert_block(&l.block, var_tracker);
                 let inner_var_names: Vec<VariableName> = assigned_vars.iter().map(|v| var_tracker.get_current(v)).collect();
